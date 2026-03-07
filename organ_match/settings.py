@@ -94,6 +94,7 @@ REST_FRAMEWORK = {
     ],
      'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 30,
+    'EXCEPTION_HANDLER': 'core.custom_exception.custom_exception_handler',
 }
 
 WSGI_APPLICATION = 'organ_match.wsgi.application'
