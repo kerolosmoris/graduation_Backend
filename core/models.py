@@ -8,6 +8,7 @@ from django.utils import timezone
 import datetime
 from django.urls import reverse
 from django.conf import settings
+from django.utils.timezone import now
 
 
 # Custom User Manager
@@ -127,7 +128,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         return f"{self.first_name} {self.last_name} ({self.role})"
 
 
-class OrganType(models.TextChoices):
+class OrganType(models.TextChoices ):
     كلية = 'كلية', 'كلية'
     كبد = 'كبد', 'كبد'
     قلب = 'قلب', 'قلب'
@@ -307,6 +308,12 @@ class OrganMatching(models.Model):
 
     class Meta:
         ordering = ['-match_percentage']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['patient', 'donor'],
+                name='unique_patient_donor_match'
+            )
+        ]
 
     def update_match(self):
         result = self.calculate_match(self.patient, self.donor)
@@ -317,8 +324,20 @@ class OrganMatching(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.request_number:
-            # توليد رقم فريد تلقائي (مثال: OM-XXXX)
-            self.request_number = f"OM-{uuid.uuid4().hex[:8].upper()}"
+            year = now().year
+
+            last_request = OrganMatching.objects.filter(
+                request_number__startswith=f"TR-{year}"
+            ).order_by('-request_number').first()
+
+            if last_request:
+                last_number = int(last_request.request_number.split('-')[-1])
+                new_number = last_number + 1
+            else:
+                new_number = 1
+
+            self.request_number = f"TR-{year}-{new_number:06d}"
+
         super().save(*args, **kwargs)
 
     def clean(self):
@@ -469,6 +488,23 @@ class PatientPriority(models.Model):
 
     def __str__(self):
         return f"{self.patient} - {self.level}"
+    
+
+class DonerHealth(models.Model):
+    doner = models.OneToOneField(User, on_delete=models.CASCADE, related_name='donor_health')
+    level = models.CharField(
+        max_length=20,
+        choices=[
+            ('صحة جيده', 'صحة جيده'),
+            ('صحة جيده جدا', 'صحة جيده جدا'),
+            ('صحة ممتازه', 'صحة ممتازه'),
+
+        ]
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.doner} - {self.level}"
 
 
 # Alerts
