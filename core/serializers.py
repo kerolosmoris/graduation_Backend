@@ -9,7 +9,8 @@ from rest_framework.authtoken.models import Token
 # register users
 class RegisterSerializer(serializers.ModelSerializer):
     role = serializers.ChoiceField(choices=[('patient', 'Patient'), ('donor', 'Donor')])
-    organ = serializers.ChoiceField(choices=OrganType.choices, write_only=True)
+    organ = serializers.ChoiceField(choices=OrganType.choices, write_only=True ,required=True,
+    allow_blank=False )
     supervisor_doctor = serializers.PrimaryKeyRelatedField(
         queryset=Doctor.objects.all(),
         required=False
@@ -40,6 +41,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         if role == "donor" and not organ:
             raise serializers.ValidationError("Donor must specify organ available")
+        
 
         return data
 
@@ -213,11 +215,12 @@ class OrganMatchingSerializer(serializers.ModelSerializer):
     # patient_detail = serializers.SerializerMethodField()
     # donor_detail = serializers.SerializerMethodField()
     hla_mismatch_count = serializers.IntegerField(read_only=True)
+    request_number = serializers.CharField(read_only=True)
 
     class Meta:
         model = OrganMatching
         fields = [
-            'id', 'patient', 'patient_detail', 'donor', 'donor_detail',
+            'id', 'patient', "request_number",'patient_detail', 'donor', 'donor_detail',
             'organ_type', 'match_percentage', 'hla_mismatch_count',
             'ai_result', 'status', 'created_at'
         ]
@@ -282,6 +285,17 @@ class PatientPrioritySerializer(serializers.ModelSerializer):
 
     def get_patient_detail(self, obj):
         return {"id": obj.patient.id, "full_name": f"{obj.patient.first_name} {obj.patient.last_name}"}
+    
+    
+class DonerHealthSerializer(serializers.ModelSerializer):
+    doner_detail = serializers.SerializerMethodField()
+
+    class Meta:
+        model =DonerHealth
+        fields = ['id', 'doner', 'doner_detail',  'level', 'updated_at']
+
+    def get_doner_detail(self, obj):
+        return {"id": obj.doner.id, "full_name": f"{obj.doner.first_name} {obj.doner.last_name}"}
 
 
 # doctor
@@ -476,6 +490,7 @@ class UserSerializer(serializers.ModelSerializer):
     mri_reports = serializers.SerializerMethodField()
     surgery_reports = serializers.SerializerMethodField()
     priority = serializers.SerializerMethodField()
+    DonerHealth = serializers.SerializerMethodField()
     allergies = serializers.SerializerMethodField()
     user_medicines = serializers.SerializerMethodField()
     alerts = serializers.SerializerMethodField()
@@ -496,7 +511,7 @@ class UserSerializer(serializers.ModelSerializer):
             'is_active', 'is_staff', 'created_at', 'medical_record_number', 'surgeries',
             # بيانات profile
             'organ_needed', 'organ_available', 'chronic_diseases', 'hospital_detail', 'supervisor_doctors_detail',
-            "appointments", "mri_reports", "surgery_reports", "priority", "alerts", 'user_reports'
+            "appointments", "mri_reports", "surgery_reports", "priority", "alerts", 'user_reports' ,'DonerHealth'
         ]
         read_only_fields = ['bmi', 'created_at', 'updated_at']
 
@@ -571,11 +586,20 @@ class UserSerializer(serializers.ModelSerializer):
         return SurgeryReportSerializer(qs, many=True).data
 
     def get_priority(self, obj):
-        from .serializers import PatientPrioritySerializer
         try:
             priority = PatientPriority.objects.select_related('patient').get(patient=obj)
             return PatientPrioritySerializer(priority).data
         except PatientPriority.DoesNotExist:
+            return None
+        
+    def get_DonerHealth(self, obj):
+        if obj.role != "donor":
+            return None
+
+        try:
+            donor_health = DonerHealth.objects.get(doner=obj)
+            return DonerHealthSerializer(donor_health).data
+        except DonerHealth.DoesNotExist:
             return None
 
     def get_alerts(self, obj):
@@ -842,6 +866,7 @@ class HospitalFullSerializer(serializers.ModelSerializer):
 
         # 2️⃣ جلب كل الـ matches مرة واحدة لكل المتبرعين
         matches_qs = OrganMatching.objects.filter(donor__in=donors_qs)
+        
 
         # 3️⃣ جلب كل التنبيهات مرة واحدة
         alerts_qs = Alert.objects.filter(user__in=donors_qs)
@@ -857,6 +882,9 @@ class HospitalFullSerializer(serializers.ModelSerializer):
             # المطابقات
             donor_matches = [m for m in matches_qs if m.donor_id == donor.id]
             donor_data['matches'] = OrganMatchingSerializer(donor_matches, many=True).data
+
+            donerhelth_qs = DonerHealth.objects.filter(patient__in=donors_qs)
+            donerhelth_map = {p.patient_id: p for p in donerhelth_qs}
 
             # التنبيهات
             donor_alerts = alerts_map.get(donor.id, [])
