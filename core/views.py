@@ -214,6 +214,40 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         serializer.save()
 
 
+# class OrganMatchingViewSet(viewsets.ModelViewSet):
+#     queryset = OrganMatching.objects.all()
+#     serializer_class = OrganMatchingSerializer
+
+#     @action(detail=False, methods=['post'])
+#     def auto_match(self, request):
+#         patients = User.objects.filter(role='patient', status='جاهز')
+#         all_matches = []
+#         for patient in patients:
+#             donors = User.objects.filter(role='donor', status='جاهز')
+
+#         for patient in patients:
+#             for donor in donors:
+#                 result = OrganMatching.calculate_match(patient, donor)
+
+#                 match, created = OrganMatching.objects.update_or_create(
+#                     patient=patient,
+#                     donor=donor,
+#                     defaults={
+#                         "organ_type": getattr(patient.patient_profile, 'organ_needed', 'N/A'),
+#                         "match_percentage": result['match_percentage'],
+#                         "ai_result": result['ai_result'],
+#                         "status": " قيد التحليل "
+                        
+#                     }
+#                 )
+#                 all_matches.append({
+#                     "patient": str(patient),
+#                     "donor": str(donor),
+#                     "organ_type": getattr(patient.patient_profile, 'organ_needed', 'N/A'),
+#                     "match_percentage": result['match_percentage']
+#                 })
+#         return Response(all_matches)
+
 class OrganMatchingViewSet(viewsets.ModelViewSet):
     queryset = OrganMatching.objects.all()
     serializer_class = OrganMatchingSerializer
@@ -237,6 +271,7 @@ class OrganMatchingViewSet(viewsets.ModelViewSet):
                         "match_percentage": result['match_percentage'],
                         "ai_result": result['ai_result'],
                         "status": " قيد التحليل "
+                        
                     }
                 )
                 all_matches.append({
@@ -246,6 +281,7 @@ class OrganMatchingViewSet(viewsets.ModelViewSet):
                     "match_percentage": result['match_percentage']
                 })
         return Response(all_matches)
+
 
 
 class SurgeryViewSet(viewsets.ModelViewSet):
@@ -381,13 +417,35 @@ class PatientPriorityViewSet(viewsets.ModelViewSet):
 
         return Response(results)
 
+class DonorHealthViewSet(viewsets.ModelViewSet):
+    queryset = DonerHealth.objects.all()
+    serializer_class = DonerHealthSerializer
+# class AlertViewSet(viewsets.ModelViewSet):
+#     queryset = Alert.objects.all()
+#     serializer_class = AlertSerializer
 
+#     def get_queryset(self):
+#         return Alert.objects.filter(user=self.request.user).order_by('-created_at')  # مؤقتًا بدون auth
+
+#     @action(detail=True, methods=['post'])
+#     def mark_read(self, request, pk=None):
+#         alert = self.get_object()
+#         alert.read = True
+#         alert.save()
+#         return Response({"detail": "Alert marked as read"})
 class AlertViewSet(viewsets.ModelViewSet):
     queryset = Alert.objects.all()
     serializer_class = AlertSerializer
+    permission_classes = [IsAuthenticated]  # 🔹 أهم خطوة
 
     def get_queryset(self):
-        return Alert.objects.filter(user=self.request.user).order_by('-created_at')  # مؤقتًا بدون auth
+        if self.request.user.is_anonymous:
+            return Alert.objects.none()  # هيرجع فاضي بدل ما يكسر
+        return Alert.objects.filter(user=self.request.user).order_by('-created_at')
+
+    def perform_create(self, serializer):
+        # تحديد المستخدم تلقائيًا عند إنشاء تنبيه
+        serializer.save(user=self.request.user)
 
     @action(detail=True, methods=['post'])
     def mark_read(self, request, pk=None):
