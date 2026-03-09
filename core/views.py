@@ -325,7 +325,7 @@ class UserReportViewSet(viewsets.ModelViewSet):
         user = getattr(self.request, 'user', None)
         if user and not user.is_anonymous:
             # لو في مستخدم مسجل، جِب تقاريره فقط
-            return UserReport.objects.filter(patient=user).order_by('-report_date', '-created_at')
+            return UserReport.objects.filter(patient=user).order_by('-created_at')
         # لو مفيش مستخدم مسجل، رجع فاضي
         return UserReport.objects.none()
 
