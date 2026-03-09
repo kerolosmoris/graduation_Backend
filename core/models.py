@@ -547,6 +547,29 @@ class AlertHospital(models.Model):
         return f"{self.hospital} - {self.alert_type}"
 
 
+# class UserReport(models.Model):
+#     reportState = (
+#         ('مكتمل', 'مكتمل'),
+#         ('تحت الاجراء', 'تحت الاجراء'),
+#     )
+#     type = (
+#         ('اشعه', 'اشعه'),
+#         ('تحاليل', 'تحاليل'),
+#         ('تقرير طبي', 'تقرير طبي'),
+#     )
+
+#     patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user_reports')
+#     report_type = models.CharField(max_length=50, choices=type)
+#     report_file = models.FileField(upload_to='user_reports/', null=True, blank=True)
+#     description = models.TextField(null=True, blank=True)
+#     state = models.CharField(max_length=20, choices=reportState, null=False)
+
+#     created_at = models.DateTimeField(auto_now_add=True)
+
+#     def __str__(self):
+#         return f"{self.patient} - {self.report_type}"
+
+
 class UserReport(models.Model):
     reportState = (
         ('مكتمل', 'مكتمل'),
@@ -562,12 +585,14 @@ class UserReport(models.Model):
     report_type = models.CharField(max_length=50, choices=type)
     report_file = models.FileField(upload_to='user_reports/', null=True, blank=True)
     description = models.TextField(null=True, blank=True)
-    state = models.CharField(max_length=20, choices=reportState, null=False)
+    report_title = models.TextField(max_length=50, blank=True)
+    state = models.CharField(max_length=20, choices=reportState, null=False ,default="'تحت الاجراء'")
 
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.patient} - {self.report_type}"
+
 
 
 class SurgeryReport(models.Model):
