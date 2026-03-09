@@ -320,23 +320,41 @@ class MRIReportViewSet(viewsets.ModelViewSet):
 class UserReportViewSet(viewsets.ModelViewSet):
     queryset = UserReport.objects.all()
     serializer_class = UserReportSerializer
+    authentication_classes = [HospitalTokenAuthentication]
 
-    def get_queryset(self):
-        user = getattr(self.request, 'user', None)
-        if user and not user.is_anonymous:
-            # لو في مستخدم مسجل، جِب تقاريره فقط
-            return UserReport.objects.filter(patient=user).order_by('-created_at')
-        # لو مفيش مستخدم مسجل، رجع فاضي
-        return UserReport.objects.none()
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
 
-    def perform_create(self, serializer):
-        user = getattr(self.request, 'user', None)
-        if user and not user.is_anonymous:
-            # لو مستخدم مسجل، اربط التقرير به
-            serializer.save(patient=user)
-        else:
-            # لو مفيش، خلي الـ patient لازم يُرسل في البيانات
+        if serializer.is_valid():
+            hospital = request.user
+            patient = serializer.validated_data.get("patient")
+
+            # التأكد أن المستخدم تابع لنفس المستشفى
+            if patient.hospital != hospital:
+                return Response(
+                    {"message": "هذا المستخدم لا يتبع هذه المستشفى"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
             serializer.save()
+
+            return Response(
+                {
+                    "message": "تم إنشاء التقرير بنجاح",
+                    "data": serializer.data
+                },
+                status=status.HTTP_201_CREATED
+            )
+
+        return Response(
+            {
+                "message": "فشل إنشاء التقرير",
+                "errors": serializer.errors
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
 class SurgeryReportViewSet(viewsets.ModelViewSet):
     queryset = SurgeryReport.objects.select_related(
         'surgery__organ_matching__patient',
