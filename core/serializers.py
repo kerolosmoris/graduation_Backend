@@ -883,8 +883,8 @@ class HospitalFullSerializer(serializers.ModelSerializer):
             donor_matches = [m for m in matches_qs if m.donor_id == donor.id]
             donor_data['matches'] = OrganMatchingSerializer(donor_matches, many=True).data
 
-            donerhelth_qs = DonerHealth.objects.filter(patient__in=donors_qs)
-            donerhelth_map = {p.patient_id: p for p in donerhelth_qs}
+            donerhelth_qs = DonerHealth.objects.filter(doner__in=donors_qs)
+            donerhelth_map = {p.doner_id: p for p in donerhelth_qs}
 
             # التنبيهات
             donor_alerts = alerts_map.get(donor.id, [])
