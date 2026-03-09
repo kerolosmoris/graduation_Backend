@@ -440,13 +440,34 @@ class AppointmentSerializer(serializers.ModelSerializer):
         return data
 
 
+# class UserReportSerializer(serializers.ModelSerializer):
+#     patient_detail = serializers.SerializerMethodField()
+
+#     class Meta:
+#         model = UserReport
+#         fields = [
+#             'id', 'patient', 'patient_detail', 'report_type',
+#             'report_file', 'description', 'created_at', 'state'
+#         ]
+
+#     def get_patient_detail(self, obj):
+#         if obj.patient:
+#             return {
+#                 "id": obj.patient.id,
+#                 "full_name": f"{obj.patient.first_name} {obj.patient.last_name}",
+#                 "national_id": getattr(obj.patient, 'national_id', None),
+#                 "role": getattr(obj.patient, 'role', None)
+#             }
+#         return None
+
+
 class UserReportSerializer(serializers.ModelSerializer):
     patient_detail = serializers.SerializerMethodField()
 
     class Meta:
         model = UserReport
         fields = [
-            'id', 'patient', 'patient_detail', 'report_type',
+            'id', 'patient', 'patient_detail', 'report_type','report_title',
             'report_file', 'description', 'created_at', 'state'
         ]
 
@@ -459,6 +480,8 @@ class UserReportSerializer(serializers.ModelSerializer):
                 "role": getattr(obj.patient, 'role', None)
             }
         return None
+
+
 
 
 class SurgerySerializer(serializers.ModelSerializer):
