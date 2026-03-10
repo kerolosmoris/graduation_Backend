@@ -254,12 +254,39 @@ class HospitalSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+# class AlertSerializer(serializers.ModelSerializer):
+#     user_detail = serializers.SerializerMethodField()
+
+#     class Meta:
+#         model = Alert
+#         fields = ['id', 'user', 'user_detail', 'message', 'message_title', 'alert_type', 'read', 'created_at', ]
+
+#     def get_user_detail(self, obj):
+#         return {"id": obj.user.id, "full_name": f"{obj.user.first_name} {obj.user.last_name}"}
+
+
+# class AlertHospitalSerializer(serializers.ModelSerializer):
+#     hospital_detail = serializers.SerializerMethodField()
+
+#     class Meta:
+#         model = AlertHospital
+#         fields = ['id', 'hospital', 'hospital_detail', 'message', 'message_title', 'alert_type', 'read', 'created_at', ]
+
+#     def get_hospital_detail(self, obj):
+#         return {"id": obj.hospital.id, "name": obj.hospital.name}
+
+
+
 class AlertSerializer(serializers.ModelSerializer):
     user_detail = serializers.SerializerMethodField()
 
     class Meta:
         model = Alert
-        fields = ['id', 'user', 'user_detail', 'message', 'message_title', 'alert_type', 'read', 'created_at', ]
+        fields = ['id', 'user', 'user_detail', 'message', 'message_title', 'alert_type', 'read', 'created_at', 'urgent']
+
+        read_only_fields = ['user']
+
+    
 
     def get_user_detail(self, obj):
         return {"id": obj.user.id, "full_name": f"{obj.user.first_name} {obj.user.last_name}"}
@@ -270,10 +297,12 @@ class AlertHospitalSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AlertHospital
-        fields = ['id', 'hospital', 'hospital_detail', 'message', 'message_title', 'alert_type', 'read', 'created_at', ]
+        fields = ['id', 'hospital', 'hospital_detail', 'message', 'message_title', 'alert_type', 'read', 'created_at','urgent' ]
 
     def get_hospital_detail(self, obj):
         return {"id": obj.hospital.id, "name": obj.hospital.name}
+
+
 
 
 class PatientPrioritySerializer(serializers.ModelSerializer):
