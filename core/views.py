@@ -314,7 +314,21 @@ class MRIReportViewSet(viewsets.ModelViewSet):
 #         serializer.save(patient=user)
 #
 
+class HospitalTokenAuthentication(BaseAuthentication):
+    def authenticate(self, request):
+        auth_header = request.headers.get("Authorization")
 
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return None
+
+        token_key = auth_header.split(" ")[1]
+
+        try:
+            token = HospitalToken.objects.get(key=token_key)
+        except HospitalToken.DoesNotExist:
+            raise exceptions.AuthenticationFailed("توكن المستشفى غير صالح")
+
+        return (token.hospital, token)
 
 
 class UserReportViewSet(viewsets.ModelViewSet):
@@ -505,21 +519,21 @@ class MedicineViewSet(viewsets.ModelViewSet):
         return qs
 
 
-class HospitalTokenAuthentication(BaseAuthentication):
-    def authenticate(self, request):
-        auth_header = request.headers.get("Authorization")
+# class HospitalTokenAuthentication(BaseAuthentication):
+#     def authenticate(self, request):
+#         auth_header = request.headers.get("Authorization")
 
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return None
+#         if not auth_header or not auth_header.startswith("Bearer "):
+#             return None
 
-        token_key = auth_header.split(" ")[1]
+#         token_key = auth_header.split(" ")[1]
 
-        try:
-            token = HospitalToken.objects.get(key=token_key)
-        except HospitalToken.DoesNotExist:
-            raise exceptions.AuthenticationFailed("توكن المستشفى غير صالح")
+#         try:
+#             token = HospitalToken.objects.get(key=token_key)
+#         except HospitalToken.DoesNotExist:
+#             raise exceptions.AuthenticationFailed("توكن المستشفى غير صالح")
 
-        return (token.hospital, token)
+#         return (token.hospital, token)
 
 
 class ChangeHospitalPasswordView(APIView):
