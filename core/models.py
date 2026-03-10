@@ -399,7 +399,7 @@ class Surgery(models.Model):
         ('تحت المتابعة', 'تحت المتابعة'),
         ('تمت بنجاح', 'تمت بنجاح'),
     ]
-    DEPARTMENT_CHOICES = 
+    DEPARTMENT_CHOICES = [
         ('كبد', 'كبد'),
         ('كلى', 'كلى'),
 
