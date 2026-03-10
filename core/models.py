@@ -43,9 +43,11 @@ class User(AbstractBaseUser, PermissionsMixin):
         ('قيد الانتظار', 'قيد الانتظار'),
         ('جاهز', 'جاهز'),
         ('قيد المراجعة', 'قيد المراجعة'),
-        ('تحت المطابقه', 'تحت المطابقه'),
-        ('تحت العمليه', 'تحت العمليه'),
+        ('تحت المطابقه', 'تحت المطابقة'),
+        ('تحت العملية', 'تحت العملية'),
         ('مرفوض', 'مرفوض'),
+        ('تمت العملية', 'تمت العملية'),
+        ('تم التبرع', 'تم التبرع'),
     )
 
     BLOOD_TYPE_CHOICES = (
@@ -127,13 +129,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.role})"
 
-
 class OrganType(models.TextChoices ):
-    كلية = 'كلية', 'كلية'
+    كلية_يسري  = 'كلية يسري', 'كلية يسري'
+    كلية_يمني  = 'كلية يمني', 'كلية يمني'
     كبد = 'كبد', 'كبد'
-    قلب = 'قلب', 'قلب'
-    رئة = 'رئة', 'رئة'
-    بنكرياس = 'بنكرياس', 'بنكرياس'
+   
 
 
 # Hospital & Doctor
@@ -292,8 +292,9 @@ class Appointment(models.Model):
 class OrganMatching(models.Model):
     STATUS_CHOICES = (
         ('قيد التحليل', 'قيد التحليل'),
-        ('تحت المراجعه', 'تحت المراجعه'),
-        ('تحت المطابقه', 'تحت المطابقه'),
+        ('تحت المراجعة', 'تحت المراجعة'),
+        ('تحت المطابقة', 'تحت المطابقة'),
+        ('تمت المطابقة', 'تمت المطابقة'),
         ('قيد الانتظار', 'قيد الانتظار'),
     )
     patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='patient_matches')
@@ -319,7 +320,7 @@ class OrganMatching(models.Model):
         result = self.calculate_match(self.patient, self.donor)
         self.match_percentage = result['match_percentage']
         self.ai_result = result['ai_result']
-        self.status = 'تحت المراجعه'
+        self.status = 'تحت المراجعة'
         self.save()
 
     def save(self, *args, **kwargs):
@@ -393,16 +394,15 @@ class OrganMatching(models.Model):
 class Surgery(models.Model):
     SURGERY_STATUS = [
         ('مجدولة', 'مجدولة'),
-        ('جاريه', 'جاريه'),
+        ('جارية', 'جارية'),
         ('مكتملة', 'مكتملة'),
         ('تحت المتابعة', 'تحت المتابعة'),
+        ('تمت بنجاح', 'تمت بنجاح'),
     ]
-    DEPARTMENT_CHOICES = [
-        ('قلب', 'قلب'),
+    DEPARTMENT_CHOICES = 
         ('كبد', 'كبد'),
         ('كلى', 'كلى'),
-        ('رئة', 'رئة'),
-        ('عظام', 'عظام'),
+
     ]
 
     surgery_number = models.CharField(max_length=50, unique=True)
@@ -477,9 +477,9 @@ class PatientPriority(models.Model):
     level = models.CharField(
         max_length=20,
         choices=[
-            ('اولوليه عاليه', 'اولوليه عاليه'),
-            ('اولوليه متوسطة', 'اولوليه متوسطة'),
-            ('اولوليه منخفضه', 'اولوليه منخفضه'),
+            ('أولوية عالية', 'أولوية عالية'),
+            ('أولوية متوسطة', 'أولوية متوسطة'),
+            ('أولوية منخفضة', 'أولوية منخفضة'),
             ('حرجة جداً', 'حرجة جداً'),
 
         ]
@@ -495,9 +495,9 @@ class DonerHealth(models.Model):
     level = models.CharField(
         max_length=20,
         choices=[
-            ('صحة جيده', 'صحة جيده'),
-            ('صحة جيده جدا', 'صحة جيده جدا'),
-            ('صحة ممتازه', 'صحة ممتازه'),
+             ('صحة جيدة', 'صحة جيدة'),
+            ('صحة جيدة جدا', 'صحة جيدة جدا'),
+            ('صحة ممتازة', 'صحة ممتازة'),
 
         ]
     )
@@ -516,6 +516,8 @@ class Alert(models.Model):
         ('حرج', 'حرج'),
     )
 
+
+    urgent = models.BooleanField(default=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='alerts')
     message_title = models.TextField()
     message = models.TextField(default="title")
@@ -540,11 +542,50 @@ class AlertHospital(models.Model):
     message = models.TextField(default="title")
     alert_type = models.CharField(max_length=20, choices=ALERT_TYPES)
     read = models.BooleanField(default=False)
+    urgent = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.hospital} - {self.alert_type}"
+
+# class Alert(models.Model):
+#     ALERT_TYPES = (
+#         ('معلومة', 'معلومة'),
+#         ('تحذير', 'تحذير'),
+#         ('طبي', 'طبي'),
+#         ('حرج', 'حرج'),
+#     )
+
+#     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='alerts')
+#     message_title = models.TextField()
+#     message = models.TextField(default="title")
+#     alert_type = models.CharField(max_length=20, choices=ALERT_TYPES)
+#     read = models.BooleanField(default=False)
+
+#     created_at = models.DateTimeField(auto_now_add=True)
+
+#     def __str__(self):
+#         return f"{self.user} - {self.alert_type}"
+
+
+# class AlertHospital(models.Model):
+#     ALERT_TYPES = (
+#         ('معلومة', 'معلومة'),
+#         ('تحذير', 'تحذير'),
+#         ('حرج', 'حرج'),
+#     )
+
+#     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, null=True, blank=True)
+#     message_title = models.TextField()
+#     message = models.TextField(default="title")
+#     alert_type = models.CharField(max_length=20, choices=ALERT_TYPES)
+#     read = models.BooleanField(default=False)
+
+#     created_at = models.DateTimeField(auto_now_add=True)
+
+#     def __str__(self):
+#         return f"{self.hospital} - {self.alert_type}"
 
 
 # class UserReport(models.Model):
