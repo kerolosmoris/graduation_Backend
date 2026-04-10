@@ -9,8 +9,7 @@ from rest_framework.authtoken.models import Token
 # register users
 class RegisterSerializer(serializers.ModelSerializer):
     role = serializers.ChoiceField(choices=[('patient', 'Patient'), ('donor', 'Donor')])
-    organ = serializers.ChoiceField(choices=OrganType.choices, write_only=True ,required=True,
-    allow_blank=False )
+    organ = serializers.ChoiceField(choices=OrganType.choices, write_only=True)
     supervisor_doctor = serializers.PrimaryKeyRelatedField(
         queryset=Doctor.objects.all(),
         required=False
@@ -41,7 +40,6 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         if role == "donor" and not organ:
             raise serializers.ValidationError("Donor must specify organ available")
-        
 
         return data
 
@@ -102,6 +100,57 @@ class HospitalRegisterSerializer(serializers.ModelSerializer):
 
 # login users AND hospitals
 
+# class UnifiedLoginSerializer(serializers.Serializer):
+#     identifier = serializers.CharField()
+#     password = serializers.CharField(write_only=True)
+
+#     def validate(self, data):
+#         identifier = data.get("identifier")
+#         password = data.get("password")
+
+#         if not identifier or not password:
+#             raise serializers.ValidationError({
+#                 "message": "الرجاء إدخال identifier و password"
+#             })
+
+#         # 🔹 لو فيه @ → Hospital
+#         if "@" in identifier:
+#             try:
+#                 hospital = Hospital.objects.get(email=identifier)
+#             except Hospital.DoesNotExist:
+#                 raise serializers.ValidationError({
+#                     "message": "المستشفى غير موجودة"
+#                 })
+
+#             if not hospital.check_password(password):
+#                 raise serializers.ValidationError({
+#                     "message": "بيانات المستشفى غير صحيحة"
+#                 })
+
+#             token, _ = HospitalToken.objects.get_or_create(hospital=hospital)
+
+#             data["type"] = "hospital"
+#             data["hospital"] = hospital
+#             data["token"] = token.key
+
+
+#         # 🔹 غير كده → User
+#         else:
+#             user = authenticate(username=identifier, password=password)
+
+#             if not user:
+#                 raise serializers.ValidationError({
+#                     "message": "بيانات المستخدم غير صحيحة"
+#                 })
+
+#             token, _ = Token.objects.get_or_create(user=user)
+
+#             data["type"] = "user"
+#             data["user"] = user
+#             data["token"] = token.key
+
+#         return data
+
 class UnifiedLoginSerializer(serializers.Serializer):
     identifier = serializers.CharField()
     password = serializers.CharField(write_only=True)
@@ -115,7 +164,28 @@ class UnifiedLoginSerializer(serializers.Serializer):
                 "message": "الرجاء إدخال identifier و password"
             })
 
-        # 🔹 لو فيه @ → Hospital
+        # 🔴 1. Ministry (5 digits only)
+        if identifier.isdigit() and len(identifier) == 5:
+            try:
+                ministry = Ministry.objects.get(national_id=identifier)
+            except Ministry.DoesNotExist:
+                raise serializers.ValidationError({
+                    "message": "الوزارة غير موجودة"
+                })
+
+            if not ministry.check_password(password):
+                raise serializers.ValidationError({
+                    "message": "كلمة مرور الوزارة غير صحيحة"
+                })
+
+            token, _ = MinistryToken.objects.get_or_create(ministry=ministry)
+
+            data["type"] = "ministry"
+            data["ministry"] = ministry
+            data["token"] = token.key
+            return data
+
+        # 🔵 2. Hospital (email)
         if "@" in identifier:
             try:
                 hospital = Hospital.objects.get(email=identifier)
@@ -134,25 +204,23 @@ class UnifiedLoginSerializer(serializers.Serializer):
             data["type"] = "hospital"
             data["hospital"] = hospital
             data["token"] = token.key
+            return data
 
+        # 🟢 3. User (national_id)
+        user = authenticate(username=identifier, password=password)
 
-        # 🔹 غير كده → User
-        else:
-            user = authenticate(username=identifier, password=password)
+        if not user:
+            raise serializers.ValidationError({
+                "message": "بيانات المستخدم غير صحيحة"
+            })
 
-            if not user:
-                raise serializers.ValidationError({
-                    "message": "بيانات المستخدم غير صحيحة"
-                })
+        token, _ = Token.objects.get_or_create(user=user)
 
-            token, _ = Token.objects.get_or_create(user=user)
-
-            data["type"] = "user"
-            data["user"] = user
-            data["token"] = token.key
+        data["type"] = "user"
+        data["user"] = user
+        data["token"] = token.key
 
         return data
-
 
 # mini serializer for search results
 class UserMiniSerializer(serializers.ModelSerializer):
@@ -210,17 +278,16 @@ class UserChronicDiseaseSerializer(serializers.ModelSerializer):
 
 
 class OrganMatchingSerializer(serializers.ModelSerializer):
-    patient_detail = UserMiniSerializer(source='patient', read_only=True)
-    donor_detail = UserMiniSerializer(source='donor', read_only=True)
-    # patient_detail = serializers.SerializerMethodField()
-    # donor_detail = serializers.SerializerMethodField()
+    # patient_detail = UserMiniSerializer(source='patient', read_only=True)
+    # donor_detail = UserMiniSerializer(source='donor', read_only=True)
+    patient_detail = serializers.SerializerMethodField()
+    donor_detail = serializers.SerializerMethodField()
     hla_mismatch_count = serializers.IntegerField(read_only=True)
-    request_number = serializers.CharField(read_only=True)
 
     class Meta:
         model = OrganMatching
         fields = [
-            'id', 'patient', "request_number",'patient_detail', 'donor', 'donor_detail',
+            'id', 'patient', 'patient_detail', 'donor', 'donor_detail',
             'organ_type', 'match_percentage', 'hla_mismatch_count',
             'ai_result', 'status', 'created_at'
         ]
@@ -254,39 +321,12 @@ class HospitalSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-# class AlertSerializer(serializers.ModelSerializer):
-#     user_detail = serializers.SerializerMethodField()
-
-#     class Meta:
-#         model = Alert
-#         fields = ['id', 'user', 'user_detail', 'message', 'message_title', 'alert_type', 'read', 'created_at', ]
-
-#     def get_user_detail(self, obj):
-#         return {"id": obj.user.id, "full_name": f"{obj.user.first_name} {obj.user.last_name}"}
-
-
-# class AlertHospitalSerializer(serializers.ModelSerializer):
-#     hospital_detail = serializers.SerializerMethodField()
-
-#     class Meta:
-#         model = AlertHospital
-#         fields = ['id', 'hospital', 'hospital_detail', 'message', 'message_title', 'alert_type', 'read', 'created_at', ]
-
-#     def get_hospital_detail(self, obj):
-#         return {"id": obj.hospital.id, "name": obj.hospital.name}
-
-
-
 class AlertSerializer(serializers.ModelSerializer):
     user_detail = serializers.SerializerMethodField()
 
     class Meta:
         model = Alert
-        fields = ['id', 'user', 'user_detail', 'message', 'message_title', 'alert_type', 'read', 'created_at', 'urgent']
-
-        read_only_fields = ['user']
-
-    
+        fields = ['id', 'user', 'user_detail', 'message', 'message_title', 'alert_type', 'read', 'created_at', ]
 
     def get_user_detail(self, obj):
         return {"id": obj.user.id, "full_name": f"{obj.user.first_name} {obj.user.last_name}"}
@@ -297,12 +337,10 @@ class AlertHospitalSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AlertHospital
-        fields = ['id', 'hospital', 'hospital_detail', 'message', 'message_title', 'alert_type', 'read', 'created_at','urgent' ]
+        fields = ['id', 'hospital', 'hospital_detail', 'message', 'message_title', 'alert_type', 'read', 'created_at', ]
 
     def get_hospital_detail(self, obj):
         return {"id": obj.hospital.id, "name": obj.hospital.name}
-
-
 
 
 class PatientPrioritySerializer(serializers.ModelSerializer):
@@ -314,17 +352,6 @@ class PatientPrioritySerializer(serializers.ModelSerializer):
 
     def get_patient_detail(self, obj):
         return {"id": obj.patient.id, "full_name": f"{obj.patient.first_name} {obj.patient.last_name}"}
-    
-    
-class DonerHealthSerializer(serializers.ModelSerializer):
-    doner_detail = serializers.SerializerMethodField()
-
-    class Meta:
-        model =DonerHealth
-        fields = ['id', 'doner', 'doner_detail',  'level', 'updated_at']
-
-    def get_doner_detail(self, obj):
-        return {"id": obj.doner.id, "full_name": f"{obj.doner.first_name} {obj.doner.last_name}"}
 
 
 # doctor
@@ -469,27 +496,6 @@ class AppointmentSerializer(serializers.ModelSerializer):
         return data
 
 
-# class UserReportSerializer(serializers.ModelSerializer):
-#     patient_detail = serializers.SerializerMethodField()
-
-#     class Meta:
-#         model = UserReport
-#         fields = [
-#             'id', 'patient', 'patient_detail', 'report_type',
-#             'report_file', 'description', 'created_at', 'state'
-#         ]
-
-#     def get_patient_detail(self, obj):
-#         if obj.patient:
-#             return {
-#                 "id": obj.patient.id,
-#                 "full_name": f"{obj.patient.first_name} {obj.patient.last_name}",
-#                 "national_id": getattr(obj.patient, 'national_id', None),
-#                 "role": getattr(obj.patient, 'role', None)
-#             }
-#         return None
-
-
 class UserReportSerializer(serializers.ModelSerializer):
     patient_detail = serializers.SerializerMethodField()
 
@@ -497,7 +503,7 @@ class UserReportSerializer(serializers.ModelSerializer):
         model = UserReport
         fields = [
             'id', 'patient', 'patient_detail', 'report_type','report_title',
-            'report_file', 'description', 'created_at', 'state'
+            'report_file', 'description', 'created_at', 'state','hospital'
         ]
 
     def get_patient_detail(self, obj):
@@ -509,7 +515,6 @@ class UserReportSerializer(serializers.ModelSerializer):
                 "role": getattr(obj.patient, 'role', None)
             }
         return None
-
 
 
 
@@ -542,7 +547,6 @@ class UserSerializer(serializers.ModelSerializer):
     mri_reports = serializers.SerializerMethodField()
     surgery_reports = serializers.SerializerMethodField()
     priority = serializers.SerializerMethodField()
-    DonerHealth = serializers.SerializerMethodField()
     allergies = serializers.SerializerMethodField()
     user_medicines = serializers.SerializerMethodField()
     alerts = serializers.SerializerMethodField()
@@ -563,7 +567,7 @@ class UserSerializer(serializers.ModelSerializer):
             'is_active', 'is_staff', 'created_at', 'medical_record_number', 'surgeries',
             # بيانات profile
             'organ_needed', 'organ_available', 'chronic_diseases', 'hospital_detail', 'supervisor_doctors_detail',
-            "appointments", "mri_reports", "surgery_reports", "priority", "alerts", 'user_reports' ,'DonerHealth'
+            "appointments", "mri_reports", "surgery_reports", "priority", "alerts", 'user_reports'
         ]
         read_only_fields = ['bmi', 'created_at', 'updated_at']
 
@@ -638,20 +642,11 @@ class UserSerializer(serializers.ModelSerializer):
         return SurgeryReportSerializer(qs, many=True).data
 
     def get_priority(self, obj):
+        from .serializers import PatientPrioritySerializer
         try:
             priority = PatientPriority.objects.select_related('patient').get(patient=obj)
             return PatientPrioritySerializer(priority).data
         except PatientPriority.DoesNotExist:
-            return None
-        
-    def get_DonerHealth(self, obj):
-        if obj.role != "donor":
-            return None
-
-        try:
-            donor_health = DonerHealth.objects.get(doner=obj)
-            return DonerHealthSerializer(donor_health).data
-        except DonerHealth.DoesNotExist:
             return None
 
     def get_alerts(self, obj):
@@ -918,7 +913,6 @@ class HospitalFullSerializer(serializers.ModelSerializer):
 
         # 2️⃣ جلب كل الـ matches مرة واحدة لكل المتبرعين
         matches_qs = OrganMatching.objects.filter(donor__in=donors_qs)
-        
 
         # 3️⃣ جلب كل التنبيهات مرة واحدة
         alerts_qs = Alert.objects.filter(user__in=donors_qs)
@@ -934,9 +928,6 @@ class HospitalFullSerializer(serializers.ModelSerializer):
             # المطابقات
             donor_matches = [m for m in matches_qs if m.donor_id == donor.id]
             donor_data['matches'] = OrganMatchingSerializer(donor_matches, many=True).data
-
-            donerhelth_qs = DonerHealth.objects.filter(doner__in=donors_qs)
-            donerhelth_map = {p.doner_id: p for p in donerhelth_qs}
 
             # التنبيهات
             donor_alerts = alerts_map.get(donor.id, [])
@@ -1018,3 +1009,44 @@ class ChangePasswordSerializer(serializers.Serializer):
             raise serializers.ValidationError("لا يمكن استخدام نفس كلمة المرور القديمة")
 
         return data
+
+
+
+
+class MinistryRegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = Ministry
+        fields = ['national_id', 'name', 'email', 'phone', 'password']
+
+    def validate_national_id(self, value):
+        if not value.isdigit() or len(value) != 5:
+            raise serializers.ValidationError("كود الوزارة لازم يكون 5 أرقام")
+        return value
+
+    def create(self, validated_data):
+        password = validated_data.pop("password")
+
+        ministry = Ministry.objects.create(**validated_data)
+        ministry.set_password(password)
+
+        return ministry
+    
+
+class MinistryAlertSerializer(serializers.ModelSerializer):
+    hospital_details = HospitalSerializer(source='sender_hospital', read_only=True)
+
+    class Meta:
+        model = MinistryAlert
+        fields = [
+            'id',
+            'hospital_details',
+            'message',
+            'message_title',
+            'alert_type',
+            'created_at',
+            'priority',
+            'read',
+            'ALERT_Status'
+        ]
