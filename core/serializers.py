@@ -1042,6 +1042,7 @@ class MinistryAlertSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'hospital_details',
+            'description',
             'message',
             'message_title',
             'alert_type',
