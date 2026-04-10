@@ -18,13 +18,16 @@ router.register(r'mri-reports', MRIReportViewSet, basename='mri-report')
 router.register(r'UserReport', UserReportViewSet, basename='UserReport')
 router.register(r'surgery-reports', SurgeryReportViewSet, basename='surgery-reports')
 router.register(r'patient-priority', PatientPriorityViewSet, basename='patient-priority')
-router.register(r'Doner-Health', DonorHealthViewSet, basename='Doner-Health')
 router.register(r'alerts', AlertViewSet, basename='alert')
 router.register(r'hospital-alerts', HospitalAlertViewSet, basename='hospital-alert')
 router.register(r'allergies', AllergyViewSet, basename='allergy')
 router.register(r'medicines', MedicineViewSet, basename='medicine')
 router.register(r'search/patients', PatientSearchViewSet, basename='patient-search')
 router.register(r'search/donors', DonorSearchViewSet, basename='donor-search')
+router.register(r'ministry/dashboard', MinistryDashboardViewSet, basename='ministry-dashboard')
+router.register(r'ministry-alerts', MinistryAlertViewSet, basename='ministry-alerts')
+
+
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -36,6 +39,8 @@ urlpatterns = [
     # path('hospital/login/', HospitalLoginView.as_view(), name='hospital-login'),
     path('login/', UnifiedLoginView.as_view(), name='unified-login'),
     path('hospital/change-password/', ChangeHospitalPasswordView.as_view(), name='change_password'),
+    path('ministry/register/', MinistryRegisterView.as_view()),
+     path('send-ministry-alert/', SendMinistryAlertView.as_view()),
 
     # path('users/search_by_organ/', search_users_by_organ, name='search_by_organ'),
 ]
