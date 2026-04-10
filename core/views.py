@@ -872,12 +872,58 @@ class MinistryDashboardViewSet(viewsets.ViewSet):
         })
     
 
+# from rest_framework.permissions import AllowAny
+
+# class MinistryAlertViewSet(viewsets.ModelViewSet):
+#     queryset = MinistryAlert.objects.all()
+#     serializer_class = MinistryAlertSerializer
+#     # permission_classes = [permissions.IsAuthenticated]
+#     permission_classes = [AllowAny]
+
+#     # 🔹 فلترة حسب الوزارة
+#     def get_queryset(self):
+#         queryset = super().get_queryset()
+#         ministry_id = self.request.query_params.get('ministry_id')
+#         if ministry_id:
+#             queryset = queryset.filter(ministry_id=ministry_id)
+#         return queryset
+
+#     # 🔹 عند الإنشاء
+#     def perform_create(self, serializer):
+#         ministry = Ministry.objects.first()
+    
+#         user = self.request.user
+    
+#         if user.is_authenticated and hasattr(user, 'hospital'):
+#             serializer.save(
+#                 ministry=ministry,
+#                 sender_hospital=user.hospital
+#             )
+#         else:
+#             serializer.save(
+#                 ministry=ministry,
+#                 sender_hospital=None
+#             )
+
+#     # 🔹 Mark as Read
+#     @action(detail=True, methods=['patch'])
+#     def mark_as_read(self, request, pk=None):
+#         alert = self.get_object()
+#         alert.read = True
+#         alert.save()
+#         return Response({"message": "تم قراءة التنبيه"})
+و  from rest_framework import viewsets, permissions
 from rest_framework.permissions import AllowAny
+from rest_framework.decorators import action
+from rest_framework.response import Response
+
+from .models import MinistryAlert, Ministry
+from .serializers import MinistryAlertSerializer
+
 
 class MinistryAlertViewSet(viewsets.ModelViewSet):
     queryset = MinistryAlert.objects.all()
     serializer_class = MinistryAlertSerializer
-    # permission_classes = [permissions.IsAuthenticated]
     permission_classes = [AllowAny]
 
     # 🔹 فلترة حسب الوزارة
@@ -891,15 +937,21 @@ class MinistryAlertViewSet(viewsets.ModelViewSet):
     # 🔹 عند الإنشاء
     def perform_create(self, serializer):
         ministry = Ministry.objects.first()
-    
+
+        # ✅ تأكد إن فيه وزارة
+        if not ministry:
+            raise ValueError("لا يوجد وزارة في النظام، من فضلك أضف وزارة أولاً")
+
         user = self.request.user
-    
+
+        # ✅ لو user مسجل وعنده hospital
         if user.is_authenticated and hasattr(user, 'hospital'):
             serializer.save(
                 ministry=ministry,
                 sender_hospital=user.hospital
             )
         else:
+            # ✅ لو anonymous
             serializer.save(
                 ministry=ministry,
                 sender_hospital=None
