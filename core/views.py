@@ -890,11 +890,20 @@ class MinistryAlertViewSet(viewsets.ModelViewSet):
 
     # 🔹 عند الإنشاء
     def perform_create(self, serializer):
-        ministry = Ministry.objects.first()  # عندك وزارة واحدة
-        serializer.save(
-            ministry=ministry,
-            hospital=self.request.user.hospital  # لو مربوط باليوزر
-        )
+        ministry = Ministry.objects.first()
+    
+        user = self.request.user
+    
+        if user.is_authenticated and hasattr(user, 'hospital'):
+            serializer.save(
+                ministry=ministry,
+                sender_hospital=user.hospital
+            )
+        else:
+            serializer.save(
+                ministry=ministry,
+                sender_hospital=None
+            )
 
     # 🔹 Mark as Read
     @action(detail=True, methods=['patch'])
