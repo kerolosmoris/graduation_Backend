@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status, generics
+from rest_framework import viewsets, status, generics ,permissions
 from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -65,36 +65,80 @@ class HospitalRegisterView(generics.GenericAPIView):
         }, status=status.HTTP_201_CREATED)
 
 
-# login users and hospitals
+# # login users and hospitals
+# class UnifiedLoginView(APIView):
+#     def post(self, request):
+#         serializer = UnifiedLoginSerializer(data=request.data)
+#         serializer.is_valid(raise_exception=True)
+
+#         if serializer.validated_data["type"] == "hospital":
+#             hospital = serializer.validated_data["hospital"]
+#             token = serializer.validated_data["token"]
+
+#             return Response({
+#                 "type": "hospital",
+#                 "id": hospital.id,
+#                 "name": hospital.name,
+#                 "hospital_type": hospital.hospital_type,
+#                 "token": token,
+#                 "message": "تم تسجيل الدخول كمستشفى بنجاح"
+#             })
+
+#         else:
+#             user = serializer.validated_data["user"]
+#             token = serializer.validated_data["token"]
+
+#             return Response({
+#                 "type": "user",
+#                 "id": user.id,
+#                 "role": user.role,
+#                 "token": token,
+#                 "message": "تم تسجيل الدخول كمستخدم بنجاح"
+#             })
 class UnifiedLoginView(APIView):
     def post(self, request):
         serializer = UnifiedLoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        if serializer.validated_data["type"] == "hospital":
-            hospital = serializer.validated_data["hospital"]
-            token = serializer.validated_data["token"]
+        data = serializer.validated_data
+
+        # 🔴 Ministry
+        if data["type"] == "ministry":
+            ministry = data["ministry"]
+
+            return Response({
+                "type": "ministry",
+                "id": ministry.id,
+                "name": ministry.name,
+                "token": data["token"],
+                "message": "تم تسجيل الدخول كوزارة بنجاح"
+            })
+
+        # 🔵 Hospital
+        elif data["type"] == "hospital":
+            hospital = data["hospital"]
 
             return Response({
                 "type": "hospital",
                 "id": hospital.id,
                 "name": hospital.name,
                 "hospital_type": hospital.hospital_type,
-                "token": token,
+                "token": data["token"],
                 "message": "تم تسجيل الدخول كمستشفى بنجاح"
             })
 
-        else:
-            user = serializer.validated_data["user"]
-            token = serializer.validated_data["token"]
+        # 🟢 User
+        elif data["type"] == "user":
+            user = data["user"]
 
             return Response({
                 "type": "user",
                 "id": user.id,
                 "role": user.role,
-                "token": token,
+                "token": data["token"],
                 "message": "تم تسجيل الدخول كمستخدم بنجاح"
             })
+
 
 
 # logout view
@@ -214,40 +258,6 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         serializer.save()
 
 
-# class OrganMatchingViewSet(viewsets.ModelViewSet):
-#     queryset = OrganMatching.objects.all()
-#     serializer_class = OrganMatchingSerializer
-
-#     @action(detail=False, methods=['post'])
-#     def auto_match(self, request):
-#         patients = User.objects.filter(role='patient', status='جاهز')
-#         all_matches = []
-#         for patient in patients:
-#             donors = User.objects.filter(role='donor', status='جاهز')
-
-#         for patient in patients:
-#             for donor in donors:
-#                 result = OrganMatching.calculate_match(patient, donor)
-
-#                 match, created = OrganMatching.objects.update_or_create(
-#                     patient=patient,
-#                     donor=donor,
-#                     defaults={
-#                         "organ_type": getattr(patient.patient_profile, 'organ_needed', 'N/A'),
-#                         "match_percentage": result['match_percentage'],
-#                         "ai_result": result['ai_result'],
-#                         "status": " قيد التحليل "
-                        
-#                     }
-#                 )
-#                 all_matches.append({
-#                     "patient": str(patient),
-#                     "donor": str(donor),
-#                     "organ_type": getattr(patient.patient_profile, 'organ_needed', 'N/A'),
-#                     "match_percentage": result['match_percentage']
-#                 })
-#         return Response(all_matches)
-
 class OrganMatchingViewSet(viewsets.ModelViewSet):
     queryset = OrganMatching.objects.all()
     serializer_class = OrganMatchingSerializer
@@ -271,7 +281,6 @@ class OrganMatchingViewSet(viewsets.ModelViewSet):
                         "match_percentage": result['match_percentage'],
                         "ai_result": result['ai_result'],
                         "status": " قيد التحليل "
-                        
                     }
                 )
                 all_matches.append({
@@ -281,7 +290,6 @@ class OrganMatchingViewSet(viewsets.ModelViewSet):
                     "match_percentage": result['match_percentage']
                 })
         return Response(all_matches)
-
 
 
 class SurgeryViewSet(viewsets.ModelViewSet):
@@ -313,60 +321,6 @@ class MRIReportViewSet(viewsets.ModelViewSet):
 #
 #         serializer.save(patient=user)
 #
-
-class HospitalTokenAuthentication(BaseAuthentication):
-    def authenticate(self, request):
-        auth_header = request.headers.get("Authorization")
-
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return None
-
-        token_key = auth_header.split(" ")[1]
-
-        try:
-            token = HospitalToken.objects.get(key=token_key)
-        except HospitalToken.DoesNotExist:
-            raise exceptions.AuthenticationFailed("توكن المستشفى غير صالح")
-
-        return (token.hospital, token)
-
-
-class UserReportViewSet(viewsets.ModelViewSet):
-    queryset = UserReport.objects.all()
-    serializer_class = UserReportSerializer
-    authentication_classes = [HospitalTokenAuthentication]
-
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-
-        if serializer.is_valid():
-            hospital = request.user
-            patient = serializer.validated_data.get("patient")
-
-            # التأكد أن المستخدم تابع لنفس المستشفى
-            if patient.hospital != hospital:
-                return Response(
-                    {"message": "هذا المستخدم لا يتبع هذه المستشفى"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            serializer.save()
-
-            return Response(
-                {
-                    "message": "تم إنشاء التقرير بنجاح",
-                    "data": serializer.data
-                },
-                status=status.HTTP_201_CREATED
-            )
-
-        return Response(
-            {
-                "message": "فشل إنشاء التقرير",
-                "errors": serializer.errors
-            },
-            status=status.HTTP_400_BAD_REQUEST
-        )
 
 
 class SurgeryReportViewSet(viewsets.ModelViewSet):
@@ -449,35 +403,13 @@ class PatientPriorityViewSet(viewsets.ModelViewSet):
 
         return Response(results)
 
-class DonorHealthViewSet(viewsets.ModelViewSet):
-    queryset = DonerHealth.objects.all()
-    serializer_class = DonerHealthSerializer
-# class AlertViewSet(viewsets.ModelViewSet):
-#     queryset = Alert.objects.all()
-#     serializer_class = AlertSerializer
 
-#     def get_queryset(self):
-#         return Alert.objects.filter(user=self.request.user).order_by('-created_at')  # مؤقتًا بدون auth
-
-#     @action(detail=True, methods=['post'])
-#     def mark_read(self, request, pk=None):
-#         alert = self.get_object()
-#         alert.read = True
-#         alert.save()
-#         return Response({"detail": "Alert marked as read"})
 class AlertViewSet(viewsets.ModelViewSet):
     queryset = Alert.objects.all()
     serializer_class = AlertSerializer
-    permission_classes = [IsAuthenticated]  # 🔹 أهم خطوة
 
     def get_queryset(self):
-        if self.request.user.is_anonymous:
-            return Alert.objects.none()  # هيرجع فاضي بدل ما يكسر
-        return Alert.objects.filter(user=self.request.user).order_by('-created_at')
-
-    def perform_create(self, serializer):
-        # تحديد المستخدم تلقائيًا عند إنشاء تنبيه
-        serializer.save(user=self.request.user)
+        return Alert.objects.filter(user=self.request.user).order_by('-created_at')  # مؤقتًا بدون auth
 
     @action(detail=True, methods=['post'])
     def mark_read(self, request, pk=None):
@@ -519,21 +451,22 @@ class MedicineViewSet(viewsets.ModelViewSet):
         return qs
 
 
-# class HospitalTokenAuthentication(BaseAuthentication):
-#     def authenticate(self, request):
-#         auth_header = request.headers.get("Authorization")
+class HospitalTokenAuthentication(BaseAuthentication):
+    def authenticate(self, request):
+        auth_header = request.headers.get("Authorization")
 
-#         if not auth_header or not auth_header.startswith("Bearer "):
-#             return None
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return None
 
-#         token_key = auth_header.split(" ")[1]
+        token_key = auth_header.split(" ")[1]
 
-#         try:
-#             token = HospitalToken.objects.get(key=token_key)
-#         except HospitalToken.DoesNotExist:
-#             raise exceptions.AuthenticationFailed("توكن المستشفى غير صالح")
+        try:
+            token = HospitalToken.objects.get(key=token_key)
+        except HospitalToken.DoesNotExist:
+            raise exceptions.AuthenticationFailed("توكن المستشفى غير صالح")
 
-#         return (token.hospital, token)
+        return (token.hospital, token)
+
 
 
 class ChangeHospitalPasswordView(APIView):
@@ -558,6 +491,49 @@ class ChangeHospitalPasswordView(APIView):
             return Response({"message": "تم تغيير كلمة السر بنجاح"})
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+class UserReportViewSet(viewsets.ModelViewSet):
+    queryset = UserReport.objects.all()
+    serializer_class = UserReportSerializer
+    authentication_classes = [HospitalTokenAuthentication]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+
+        if serializer.is_valid():
+            hospital = request.user
+            patient = serializer.validated_data.get("patient")
+
+            # التأكد أن المستخدم تابع لنفس المستشفى
+            if patient.hospital != hospital:
+                return Response(
+                    {"message": "هذا المستخدم لا يتبع هذه المستشفى"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            serializer.save(hospital=hospital)
+
+            return Response(
+                {
+                    "message": "تم إنشاء التقرير بنجاح",
+                    "data": serializer.data
+                },
+                status=status.HTTP_201_CREATED
+            )
+
+        return Response(
+            {
+                "message": "فشل إنشاء التقرير",
+                "errors": serializer.errors
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+
+
 
 
 class PatientSearchViewSet(viewsets.ReadOnlyModelViewSet):
@@ -615,3 +591,383 @@ class DonorSearchViewSet(viewsets.ReadOnlyModelViewSet):
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+
+class HospitalSearchViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Hospital.objects.all()
+    serializer_class = HospitalFullSerializer
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+
+        # البحث بالكلمة المفتاحية
+        search = request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(name__icontains=search) |
+                Q(hospital_type__icontains=search) |
+                Q(location__icontains=search)
+            )
+
+        # ممكن تضيفي فلترة إضافية لو حابة (مثلاً حسب الحالة)
+        status = request.query_params.get('status')
+        if status and status.lower() != 'all':
+            queryset = queryset.filter(status=status)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+
+class MinistryRegisterView(generics.CreateAPIView):
+    serializer_class = MinistryRegisterSerializer
+
+    def create(self, request, *args, **kwargs):
+        if Ministry.objects.exists():
+            return Response(
+                {"message": "يوجد وزارة بالفعل"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        ministry = serializer.save()
+
+        return Response({
+            "id": ministry.id,
+            "name": ministry.name,
+            "message": "تم تسجيل الوزارة بنجاح"
+        }, status=status.HTTP_201_CREATED)
+    
+
+
+
+# class MinistryDashboardViewSet(viewsets.ViewSet):
+
+#     def list(self, request):
+#         total_hospitals = Hospital.objects.count()
+#         total_patients = User.objects.filter(role='patient').count()
+#         total_donors = User.objects.filter(role='donor').count()
+#         total_surgeries = Surgery.objects.count()
+#         successful_surgeries = Surgery.objects.filter(status='مكتملة').count()
+
+#         return Response({
+#             "total_hospitals": total_hospitals,
+#             "total_patients": total_patients,
+#             "total_donors": total_donors,
+#             "total_surgeries": total_surgeries,
+#             "successful_surgeries": successful_surgeries
+#         })
+    
+#     @action(detail=False, methods=['get'])
+#     def surgery_organ_stats(self, request):
+
+#         total_operations = Surgery.objects.count()
+#         total_successful = Surgery.objects.filter(status='مكتملة').count()
+
+#         # عدد العمليات لكل عضو
+#         organ_operations = Surgery.objects.values('organ_matching__organ_type') \
+#             .annotate(count=Count('id'))
+
+#         organ_data = []
+#         for item in organ_operations:
+#             organ_name = item['organ_matching__organ_type']
+#             percentage = (item['count'] / total_operations) * 100 if total_operations > 0 else 0
+#             successful_count = Surgery.objects.filter(
+#                 organ_matching__organ_type=organ_name, status='مكتملة'
+#             ).count()
+#             success_percentage = (successful_count / item['count']) * 100 if item['count'] > 0 else 0
+
+#             organ_data.append({
+#                 "organ": organ_name,
+#                 "count": item['count'],
+#                 "percentage": round(percentage, 2),
+#                 "successful_count": successful_count,
+#                 "success_percentage": round(success_percentage, 2)
+#             })
+
+#         return Response({
+#             "total_operations": total_operations,
+#             "total_successful": total_successful,
+#             "organs": organ_data
+#         })
+    
+
+
+# from rest_framework import viewsets
+# from rest_framework.response import Response
+# from django.db.models import Count, Q
+
+
+from django.db.models.functions import TruncMonth
+
+class MinistryDashboardViewSet(viewsets.ViewSet):
+
+    def list(self, request):
+        total_hospitals = Hospital.objects.count()
+        total_patients = User.objects.filter(role='patient').count()
+        total_donors = User.objects.filter(role='donor').count()
+        total_surgeries = Surgery.objects.count()
+        successful_surgeries = Surgery.objects.filter(status='مكتملة').count()
+
+        # بيانات كل مستشفى
+        hospitals = Hospital.objects.all()
+        alerts_qs = MinistryAlert.objects.all().order_by('-created_at')
+
+        ministry_alerts_data = [
+            {
+                "id": a.id,
+                "message_title": a.message_title,
+                "message": a.message,
+                "alert_type": a.alert_type,
+                "priority": a.priority,
+                "read": a.read,
+                "status": a.ALERT_Status,
+                "created_at": a.created_at.strftime('%Y-%m-%d'),
+                "hospital": a.sender_hospital.name if a.sender_hospital else None
+            }
+            for a in alerts_qs
+        ]
+
+        
+        alerts_stats = {
+            "total_alerts": alerts_qs.count(),
+            "unread_alerts": alerts_qs.filter(read=False).count(),
+            "under_investigation": alerts_qs.filter(ALERT_Status="قيد التحقيق").count(),
+            "resolved_alerts": alerts_qs.filter(alert_type='تم الحل').count(),
+        }
+
+
+
+
+# بيانات كل مستشفى
+        hospitals_data = []
+        for h in hospitals:
+            # 🔔 إشعارات الوزارة
+            # التنبيهات الخاصة بالمستشفى
+            alerts_qs = AlertHospital.objects.filter(hospital=h).order_by('-created_at')
+            alerts_data = [
+                {
+                    "id": a.id,
+                    "message": a.message,
+                    "message_title": a.message_title,
+                    "alert_type": a.alert_type,
+                    "read": a.read,
+                    "created_at": a.created_at.strftime('%Y-%m-%d %H:%M:%S')
+                }
+                for a in alerts_qs
+            ]
+           
+            surgeries_qs = Surgery.objects.filter(hospital=h)
+            surgeries_list = [
+                {
+                    "id": s.id,
+                    "surgery_number": s.surgery_number,
+                    "surgery_name": s.surgery_name,
+                    "organ_type": s.organ_matching.organ_type if s.organ_matching else None,
+                    "status": s.status,
+                    "scheduled_date": s.scheduled_date,
+                    "scheduled_time": s.scheduled_time,
+                    "created_at": s.created_at.strftime('%Y-%m-%d'),
+                    "patient_name": str(s.organ_matching.patient) if s.organ_matching else None,
+                    "birthdate": s.organ_matching.patient.birthdate.strftime('%Y-%m-%d') if s.organ_matching and s.organ_matching.patient.birthdate else None
+                }
+                for s in surgeries_qs
+            ]
+            
+
+            patients_count = User.objects.filter(role='patient', hospital=h).count()
+            donors_count = User.objects.filter(role='donor', hospital=h).count()
+
+            # العمليات في المستشفى
+            surgeries_count = Surgery.objects.filter(hospital=h).count()
+            successful_surgeries_count = Surgery.objects.filter(hospital=h, status='مكتملة').count()
+
+            # عدد الأعضاء المطلوبة لكل مستشفى مع اسم العضو وعدده
+            organs_needed = Surgery.objects.filter(
+                hospital=h,
+                organ_matching__isnull=False
+            ).values('organ_matching__organ_type') \
+            .annotate(count=Count('organ_matching__organ_type')) \
+            .order_by('-count')
+
+            organs_needed_list = [
+                {"organ": o['organ_matching__organ_type'], "count": o['count']}
+                for o in organs_needed
+            ]
+
+            hospitals_data.append({
+                "id": h.id,
+                "name": h.name,
+                "location": h.location,
+                "hospital_type": h.hospital_type,
+                "status": h.status,
+                "phone": h.phone,
+                "email": h.email,
+                "patients_count": patients_count,
+                "donors_count": donors_count,
+                "total_surgeries": surgeries_count,
+                "successful_surgeries": successful_surgeries_count,
+                "success_percentage": round((successful_surgeries_count / surgeries_count) * 100, 2) if surgeries_count > 0 else 0,
+                "organs_needed": organs_needed_list,
+                "hospital_alerts": alerts_data,
+                "surgeries": surgeries_list,
+            })
+            hospitals_data.sort(key=lambda x: x['patients_count'], reverse=True)
+
+            # إضافة حقل الترتيب لكل مستشفى
+            for index, h_data in enumerate(hospitals_data, start=1):
+                h_data['rank'] = index
+
+
+        # # البيانات السابقة (عمليات، نسب نجاح، ... )
+        organ_operations = Surgery.objects.values('organ_matching__organ_type') \
+            .annotate(count=Count('id'))
+
+        organ_data = []
+        for item in organ_operations:
+            organ_name = item['organ_matching__organ_type']
+            percentage = (item['count'] / total_surgeries) * 100 if total_surgeries > 0 else 0
+            successful_count = Surgery.objects.filter(
+                organ_matching__organ_type=organ_name, status='مكتملة'
+            ).count()
+            success_percentage = (successful_count / item['count']) * 100 if item['count'] > 0 else 0
+            organ_data.append({
+                "organ": organ_name,
+                "count": item['count'],
+                "percentage": round(percentage, 2),
+                "successful_count": successful_count,
+                "success_percentage": round(success_percentage, 2)
+            })
+
+        # إحصائيات شهرية
+        monthly_stats = Surgery.objects.annotate(month=TruncMonth('created_at')) \
+            .values('month') \
+            .annotate(
+                total=Count('id'),
+                successful=Count('id', filter=Q(status='مكتملة'))
+            ).order_by('month')
+
+        monthly_data = []
+        for stat in monthly_stats:
+            total = stat['total']
+            successful = stat['successful']
+            monthly_data.append({
+                "month": stat['month'].strftime('%Y-%m'),
+                "total_surgeries": total,
+                "successful_surgeries": successful,
+                "success_percentage": round((successful / total) * 100, 2) if total > 0 else 0
+            })
+
+        return Response({
+            "total_hospitals": total_hospitals,
+            "total_patients": total_patients,
+            "total_donors": total_donors,
+            "total_surgeries": total_surgeries,
+            "successful_surgeries": successful_surgeries,
+            "hospitals": hospitals_data,
+            "organs_stats": organ_data,
+            "monthly_surgery_stats": monthly_data,
+            "ministry_alerts": ministry_alerts_data,
+            "alerts_statistics": alerts_stats,
+        })
+    
+
+from rest_framework.permissions import AllowAny
+
+class MinistryAlertViewSet(viewsets.ModelViewSet):
+    queryset = MinistryAlert.objects.all()
+    serializer_class = MinistryAlertSerializer
+    # permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [AllowAny]
+
+    # 🔹 فلترة حسب الوزارة
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        ministry_id = self.request.query_params.get('ministry_id')
+        if ministry_id:
+            queryset = queryset.filter(ministry_id=ministry_id)
+        return queryset
+
+    # 🔹 عند الإنشاء
+    def perform_create(self, serializer):
+        ministry = Ministry.objects.first()  # عندك وزارة واحدة
+        serializer.save(
+            ministry=ministry,
+            hospital=self.request.user.hospital  # لو مربوط باليوزر
+        )
+
+    # 🔹 Mark as Read
+    @action(detail=True, methods=['patch'])
+    def mark_as_read(self, request, pk=None):
+        alert = self.get_object()
+        alert.read = True
+        alert.save()
+        return Response({"message": "تم قراءة التنبيه"})
+
+
+
+
+
+class CreateMinistryAlertView(generics.CreateAPIView):
+    serializer_class = MinistryAlertSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        # هتجيب الوزارة (بما إن عندك واحدة بس)
+        ministry = Ministry.objects.first()
+
+        serializer.save(
+            ministry=ministry,
+            hospital=self.request.user.hospital  # لو المستخدم تابع مستشفى
+        )
+
+
+
+
+class SendMinistryAlertView(APIView):
+    authentication_classes = [HospitalTokenAuthentication]
+
+    def post(self, request):
+        try:
+            hospital = request.user
+            ministry = Ministry.objects.first()
+
+            if not ministry:
+                return Response({
+                    "success": False,
+                    "message": "لا يوجد وزارة مسجلة"
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            data = request.data
+
+            # validation بسيط
+            if not data.get("message_title") or not data.get("message"):
+                return Response({
+                    "success": False,
+                    "message": "العنوان والرسالة مطلوبين"
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            alert = MinistryAlert.objects.create(
+                ministry=ministry,
+                sender_hospital=hospital,
+                message_title=data.get("message_title"),
+                message=data.get("message"),
+                alert_type=data.get("alert_type"),
+                ALERT_Status="قيد التحقيق",
+                priority=data.get("priority", "متوسطة"),
+            )
+
+            return Response({
+                "success": True,
+                "message": "تم إرسال الإشعار للوزارة بنجاح",
+                "data": {
+                    "alert_id": alert.id
+                }
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({
+                "success": False,
+                "message": "حدث خطأ أثناء إرسال الإشعار",
+                "errors": str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
