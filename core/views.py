@@ -912,7 +912,7 @@ class MinistryDashboardViewSet(viewsets.ViewSet):
 #         alert.read = True
 #         alert.save()
 #         return Response({"message": "تم قراءة التنبيه"})
-و  from rest_framework import viewsets, permissions
+
 from rest_framework.permissions import AllowAny
 from rest_framework.decorators import action
 from rest_framework.response import Response
