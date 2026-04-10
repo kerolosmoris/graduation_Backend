@@ -8,7 +8,6 @@ from django.utils import timezone
 import datetime
 from django.urls import reverse
 from django.conf import settings
-from django.utils.timezone import now
 
 
 # Custom User Manager
@@ -43,11 +42,9 @@ class User(AbstractBaseUser, PermissionsMixin):
         ('قيد الانتظار', 'قيد الانتظار'),
         ('جاهز', 'جاهز'),
         ('قيد المراجعة', 'قيد المراجعة'),
-        ('تحت المطابقه', 'تحت المطابقة'),
-        ('تحت العملية', 'تحت العملية'),
+        ('تحت المطابقه', 'تحت المطابقه'),
+        ('تحت العمليه', 'تحت العمليه'),
         ('مرفوض', 'مرفوض'),
-        ('تمت العملية', 'تمت العملية'),
-        ('تم التبرع', 'تم التبرع'),
     )
 
     BLOOD_TYPE_CHOICES = (
@@ -129,11 +126,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.role})"
 
-class OrganType(models.TextChoices ):
-    كلية_يسري  = 'كلية يسري', 'كلية يسري'
-    كلية_يمني  = 'كلية يمني', 'كلية يمني'
+
+class OrganType(models.TextChoices):
+    كلية_يمنى = 'كلية يمنى', 'كلية يمنى'
+    كلية_يسرى = 'كلية يسرى', 'كلية يسرى'
     كبد = 'كبد', 'كبد'
-   
 
 
 # Hospital & Doctor
@@ -152,6 +149,13 @@ class Hospital(models.Model):
     working_hours = models.CharField(max_length=100, blank=False, null=False)
     hospital_type = models.CharField(max_length=10, choices=HOSPITAL_TYPE_CHOICES, default='حكومي')
     password = models.CharField(max_length=128)
+    ministry = models.ForeignKey(
+    'Ministry',
+    on_delete=models.SET_NULL,
+    null=True,
+    blank=True,
+    related_name="hospitals"
+)
 
     #     ministry = models.ForeignKey(
     #     'Ministry',
@@ -161,15 +165,15 @@ class Hospital(models.Model):
     #     related_name="hospitals"
     # )
 
-    #     status = models.CharField(
-    #         max_length=20,
-    #         choices=[
-    #             ('تحت المراجعه', 'تحت المراجعه'),
-    #             ('نشط', 'نشط'),
-    #             ('مرفوض', 'مرفوض'),
-    #         ],
-    #         default='تحت المراجعه'
-    # )
+    status = models.CharField(
+            max_length=20,
+            choices=[
+                ('تحت المراجعه', 'تحت المراجعه'),
+                ('نشط', 'نشط'),
+                ('مرفوض', 'مرفوض'),
+            ],
+            default='تحت المراجعه'
+    )
     def set_password(self, raw_password):
         self.password = make_password(raw_password)
         self.save(update_fields=['password'])
@@ -292,9 +296,8 @@ class Appointment(models.Model):
 class OrganMatching(models.Model):
     STATUS_CHOICES = (
         ('قيد التحليل', 'قيد التحليل'),
-        ('تحت المراجعة', 'تحت المراجعة'),
-        ('تحت المطابقة', 'تحت المطابقة'),
-        ('تمت المطابقة', 'تمت المطابقة'),
+        ('تحت المراجعه', 'تحت المراجعه'),
+        ('تحت المطابقه', 'تحت المطابقه'),
         ('قيد الانتظار', 'قيد الانتظار'),
     )
     patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='patient_matches')
@@ -309,36 +312,18 @@ class OrganMatching(models.Model):
 
     class Meta:
         ordering = ['-match_percentage']
-        constraints = [
-            models.UniqueConstraint(
-                fields=['patient', 'donor'],
-                name='unique_patient_donor_match'
-            )
-        ]
 
     def update_match(self):
         result = self.calculate_match(self.patient, self.donor)
         self.match_percentage = result['match_percentage']
         self.ai_result = result['ai_result']
-        self.status = 'تحت المراجعة'
+        self.status = 'تحت المراجعه'
         self.save()
 
     def save(self, *args, **kwargs):
         if not self.request_number:
-            year = now().year
-
-            last_request = OrganMatching.objects.filter(
-                request_number__startswith=f"TR-{year}"
-            ).order_by('-request_number').first()
-
-            if last_request:
-                last_number = int(last_request.request_number.split('-')[-1])
-                new_number = last_number + 1
-            else:
-                new_number = 1
-
-            self.request_number = f"TR-{year}-{new_number:06d}"
-
+            # توليد رقم فريد تلقائي (مثال: OM-XXXX)
+            self.request_number = f"OM-{uuid.uuid4().hex[:8].upper()}"
         super().save(*args, **kwargs)
 
     def clean(self):
@@ -394,15 +379,16 @@ class OrganMatching(models.Model):
 class Surgery(models.Model):
     SURGERY_STATUS = [
         ('مجدولة', 'مجدولة'),
-        ('جارية', 'جارية'),
+        ('جاريه', 'جاريه'),
         ('مكتملة', 'مكتملة'),
         ('تحت المتابعة', 'تحت المتابعة'),
-        ('تمت بنجاح', 'تمت بنجاح'),
     ]
     DEPARTMENT_CHOICES = [
+        
         ('كبد', 'كبد'),
         ('كلى', 'كلى'),
-
+        
+    
     ]
 
     surgery_number = models.CharField(max_length=50, unique=True)
@@ -477,9 +463,9 @@ class PatientPriority(models.Model):
     level = models.CharField(
         max_length=20,
         choices=[
-            ('أولوية عالية', 'أولوية عالية'),
-            ('أولوية متوسطة', 'أولوية متوسطة'),
-            ('أولوية منخفضة', 'أولوية منخفضة'),
+            ('اولوليه عاليه', 'اولوليه عاليه'),
+            ('اولوليه متوسطة', 'اولوليه متوسطة'),
+            ('اولوليه منخفضه', 'اولوليه منخفضه'),
             ('حرجة جداً', 'حرجة جداً'),
 
         ]
@@ -488,23 +474,6 @@ class PatientPriority(models.Model):
 
     def __str__(self):
         return f"{self.patient} - {self.level}"
-    
-
-class DonerHealth(models.Model):
-    doner = models.OneToOneField(User, on_delete=models.CASCADE, related_name='donor_health')
-    level = models.CharField(
-        max_length=20,
-        choices=[
-             ('صحة جيدة', 'صحة جيدة'),
-            ('صحة جيدة جدا', 'صحة جيدة جدا'),
-            ('صحة ممتازة', 'صحة ممتازة'),
-
-        ]
-    )
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"{self.doner} - {self.level}"
 
 
 # Alerts
@@ -516,8 +485,6 @@ class Alert(models.Model):
         ('حرج', 'حرج'),
     )
 
-
-    urgent = models.BooleanField(default=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='alerts')
     message_title = models.TextField()
     message = models.TextField(default="title")
@@ -542,73 +509,14 @@ class AlertHospital(models.Model):
     message = models.TextField(default="title")
     alert_type = models.CharField(max_length=20, choices=ALERT_TYPES)
     read = models.BooleanField(default=False)
-    urgent = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.hospital} - {self.alert_type}"
 
-# class Alert(models.Model):
-#     ALERT_TYPES = (
-#         ('معلومة', 'معلومة'),
-#         ('تحذير', 'تحذير'),
-#         ('طبي', 'طبي'),
-#         ('حرج', 'حرج'),
-#     )
-
-#     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='alerts')
-#     message_title = models.TextField()
-#     message = models.TextField(default="title")
-#     alert_type = models.CharField(max_length=20, choices=ALERT_TYPES)
-#     read = models.BooleanField(default=False)
-
-#     created_at = models.DateTimeField(auto_now_add=True)
-
-#     def __str__(self):
-#         return f"{self.user} - {self.alert_type}"
 
 
-# class AlertHospital(models.Model):
-#     ALERT_TYPES = (
-#         ('معلومة', 'معلومة'),
-#         ('تحذير', 'تحذير'),
-#         ('حرج', 'حرج'),
-#     )
-
-#     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, null=True, blank=True)
-#     message_title = models.TextField()
-#     message = models.TextField(default="title")
-#     alert_type = models.CharField(max_length=20, choices=ALERT_TYPES)
-#     read = models.BooleanField(default=False)
-
-#     created_at = models.DateTimeField(auto_now_add=True)
-
-#     def __str__(self):
-#         return f"{self.hospital} - {self.alert_type}"
-
-
-# class UserReport(models.Model):
-#     reportState = (
-#         ('مكتمل', 'مكتمل'),
-#         ('تحت الاجراء', 'تحت الاجراء'),
-#     )
-#     type = (
-#         ('اشعه', 'اشعه'),
-#         ('تحاليل', 'تحاليل'),
-#         ('تقرير طبي', 'تقرير طبي'),
-#     )
-
-#     patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user_reports')
-#     report_type = models.CharField(max_length=50, choices=type)
-#     report_file = models.FileField(upload_to='user_reports/', null=True, blank=True)
-#     description = models.TextField(null=True, blank=True)
-#     state = models.CharField(max_length=20, choices=reportState, null=False)
-
-#     created_at = models.DateTimeField(auto_now_add=True)
-
-#     def __str__(self):
-#         return f"{self.patient} - {self.report_type}"
 
 
 class UserReport(models.Model):
@@ -626,14 +534,14 @@ class UserReport(models.Model):
     report_type = models.CharField(max_length=50, choices=type)
     report_file = models.FileField(upload_to='user_reports/', null=True, blank=True)
     description = models.TextField(null=True, blank=True)
-    report_title = models.TextField(max_length=50, blank=True)
-    state = models.CharField(max_length=20, choices=reportState, null=False ,default="'تحت الاجراء'")
+    report_title = models.TextField(null=True, blank=True)
+    state = models.CharField(max_length=20, choices=reportState, null=False)
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='reports', null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.patient} - {self.report_type}"
-
 
 
 class SurgeryReport(models.Model):
@@ -717,3 +625,108 @@ class HospitalToken(models.Model):
 
 #     def __str__(self):
 #         return self.name
+
+
+
+class Ministry(models.Model):
+    national_id = models.CharField(max_length=5, unique=True)
+    name = models.CharField(max_length=200)
+    email = models.EmailField(unique=True)
+    phone = models.CharField(max_length=20)
+    password = models.CharField(max_length=128)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        # 🚫 منع إنشاء أكتر من وزارة
+        if not self.pk and Ministry.objects.exists():
+            raise ValidationError("يوجد وزارة بالفعل، لا يمكن إنشاء أكثر من واحدة")
+        super().save(*args, **kwargs)
+
+    def set_password(self, raw_password):
+        self.password = make_password(raw_password)
+        self.save(update_fields=['password'])
+
+    def check_password(self, raw_password):
+        return check_password(raw_password, self.password)
+    
+    def clean(self):
+        if not self.national_id.isdigit() or len(self.national_id) != 5:
+            raise ValidationError("كود الوزارة لازم يكون 5 أرقام")
+
+    def __str__(self):
+        return self.name
+    
+
+class MinistryToken(models.Model):
+    ministry = models.OneToOneField(Ministry, on_delete=models.CASCADE)
+    key = models.CharField(max_length=40, unique=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if not self.key:
+            self.key = uuid.uuid4().hex
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.ministry.name} Token"
+
+
+
+class MinistryAlert(models.Model):
+    ALERT_TYPES = (
+        ('خطر', 'خطر'),
+        ('تحذير', 'تحذير'),
+        ('تم الحل', 'تم الحل'),
+        ('حرج', 'حرج'),
+        
+    )
+    ALERT_Status = (
+        ('متابعة التحقيق', 'متابعة التحقيق'),
+        ('قيد التحقيق', 'قيد التحقيق'),
+        
+    )
+ 
+    PRIORITY_CHOICES = (
+        ('منخفضة', 'منخفضة'),
+        ('متوسطة', 'متوسطة'),
+        ('عالية', 'عالية'),
+    )
+
+    ministry = models.ForeignKey(
+        Ministry,
+        on_delete=models.CASCADE,
+        related_name='alerts'
+    )
+
+    sender_hospital = models.ForeignKey(
+        Hospital,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='ministry_notifications'
+            )
+
+    message_title = models.TextField()
+    message = models.TextField()
+
+    alert_type = models.CharField(
+        max_length=20,
+        choices=ALERT_TYPES
+    )
+    ALERT_Status= models.CharField(
+        max_length=20,
+        choices=ALERT_Status
+    )
+
+    priority = models.CharField(
+        max_length=10,
+        choices=PRIORITY_CHOICES,
+        default='متوسطة'
+    )
+    description = models.TextField(blank=True, null=True)
+
+    read = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.ministry.name} - {self.alert_type} - {self.priority}"
