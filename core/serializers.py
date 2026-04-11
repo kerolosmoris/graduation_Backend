@@ -278,10 +278,10 @@ class UserChronicDiseaseSerializer(serializers.ModelSerializer):
 
 
 class OrganMatchingSerializer(serializers.ModelSerializer):
-    # patient_detail = UserMiniSerializer(source='patient', read_only=True)
-    # donor_detail = UserMiniSerializer(source='donor', read_only=True)
-    patient_detail = serializers.SerializerMethodField()
-    donor_detail = serializers.SerializerMethodField()
+    patient_detail = UserMiniSerializer(source='patient', read_only=True)
+    donor_detail = UserMiniSerializer(source='donor', read_only=True)
+    # patient_detail = serializers.SerializerMethodField()
+    # donor_detail = serializers.SerializerMethodField()
     hla_mismatch_count = serializers.IntegerField(read_only=True)
 
     class Meta:
