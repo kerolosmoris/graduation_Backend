@@ -12,7 +12,7 @@ from django.db.models import Count, Q
 from rest_framework.authentication import BaseAuthentication
 from rest_framework import exceptions
 from .models import *
-
+from babel.dates import format_date
 
 # User Registration View
 class RegisterUserView(generics.CreateAPIView):
@@ -852,7 +852,7 @@ class MinistryDashboardViewSet(viewsets.ViewSet):
             total = stat['total']
             successful = stat['successful']
             monthly_data.append({
-                "month": stat['month'].strftime('%Y-%m'),
+                "month": format_date(stat['month'], format='MMMM', locale='ar'),
                 "total_surgeries": total,
                 "successful_surgeries": successful,
                 "success_percentage": round((successful / total) * 100, 2) if total > 0 else 0
