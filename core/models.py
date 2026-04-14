@@ -375,12 +375,74 @@ class OrganMatching(models.Model):
         }
 
 
+# # Surgery
+# class Surgery(models.Model):
+#     SURGERY_STATUS = [
+#         ('مجدولة', 'مجدولة'),
+#         ('جاريه', 'جاريه'),
+#         ('مكتملة', 'مكتملة'),
+#         ('تحت المتابعة', 'تحت المتابعة'),
+#     ]
+#     DEPARTMENT_CHOICES = [
+        
+#         ('كبد', 'كبد'),
+#         ('كلى', 'كلى'),
+        
+    
+#     ]
+
+#     surgery_number = models.CharField(max_length=50, unique=True)
+#     organ_matching = models.OneToOneField(OrganMatching, on_delete=models.CASCADE)
+#     surgery_name = models.CharField(max_length=100)
+#     department = models.CharField(
+#         max_length=50,
+#         choices=DEPARTMENT_CHOICES,
+#         default='كلى'
+#     )
+
+#     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, null=False)
+#     doctor = models.ForeignKey(Doctor, on_delete=models.SET_NULL, null=True)
+
+#     scheduled_date = models.DateField()
+#     scheduled_time = models.TimeField(null=True, blank=True)
+
+#     status = models.CharField(
+#         max_length=20,
+#         choices=SURGERY_STATUS,
+#         default='مجدولة'
+#     )
+#     duration = models.PositiveIntegerField(null=True, blank=True)
+#     operation_room = models.CharField(max_length=100, null=True, blank=True)
+
+#     created_at = models.DateTimeField(auto_now_add=True)
+
+#     def clean(self):
+#         if self.scheduled_time:
+#             surgery_datetime = datetime.datetime.combine(
+#                 self.scheduled_date,
+#                 self.scheduled_time
+#             )
+#             surgery_datetime = timezone.make_aware(
+#                 surgery_datetime,
+#                 timezone.get_current_timezone()
+#             )
+#             if surgery_datetime <= timezone.now():
+#                 raise ValidationError("Surgery must be in the future")
+#         else:
+#             if self.scheduled_date < timezone.now().date():
+#                 raise ValidationError("Surgery date must be in the future")
+
+#     def __str__(self):
+#         return f"Surgery {self.surgery_number}"
+
+#     def get_admin_url(self):
+#         return reverse("admin:core_surgery_change", args=[self.id])
 # Surgery
 class Surgery(models.Model):
     SURGERY_STATUS = [
         ('مجدولة', 'مجدولة'),
         ('جاريه', 'جاريه'),
-        ('مكتملة', 'مكتملة'),
+        ('تمت بنجاح', 'تمت بنجاح'),
         ('تحت المتابعة', 'تحت المتابعة'),
     ]
     DEPARTMENT_CHOICES = [
@@ -437,7 +499,6 @@ class Surgery(models.Model):
 
     def get_admin_url(self):
         return reverse("admin:core_surgery_change", args=[self.id])
-
 
 # MRI Reports
 class MRIReport(models.Model):
