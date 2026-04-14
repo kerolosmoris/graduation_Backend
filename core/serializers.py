@@ -334,13 +334,17 @@ class AlertSerializer(serializers.ModelSerializer):
 
 class AlertHospitalSerializer(serializers.ModelSerializer):
     hospital_detail = serializers.SerializerMethodField()
+    is_urgent = serializers.SerializerMethodField()
 
     class Meta:
         model = AlertHospital
-        fields = ['id', 'hospital', 'hospital_detail', 'message', 'message_title', 'alert_type', 'read', 'created_at', ]
+        fields = ['id', 'hospital', 'hospital_detail', 'message', 'message_title', 'alert_type', 'read','is_urgent', 'created_at', ]
 
     def get_hospital_detail(self, obj):
         return {"id": obj.hospital.id, "name": obj.hospital.name}
+
+    def get_is_urgent(self, obj):
+        return obj.alert_type == "حرج"
 
 
 class PatientPrioritySerializer(serializers.ModelSerializer):
