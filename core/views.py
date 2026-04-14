@@ -1244,6 +1244,7 @@ class MinistryDashboardViewSet(viewsets.ViewSet):
 
             # 🔔 Alerts
             alerts_qs = AlertHospital.objects.filter(hospital=h).order_by('-created_at')
+            
 
             # 🏥 Surgeries
             surgeries_qs = Surgery.objects.filter(hospital=h)
@@ -1259,6 +1260,35 @@ class MinistryDashboardViewSet(viewsets.ViewSet):
                 round((successful_surgeries / total_surgeries) * 100, 2)
                 if total_surgeries > 0 else 0
             )
+            # ✅ آخر 3 عمليات ناجحة لكل مستشفى
+            latest_successful_qs = Surgery.objects.filter(
+                hospital=h,
+                 status__in=['تمت بنجاح', 'فشلت']
+            ).order_by('-created_at')[:3]
+
+            if not latest_successful_qs.exists():
+                latest_successful = "مفيش عمليات ناجحة"
+            else:
+                latest_successful = [
+                    {
+                        "id": s.id,
+                        "surgery_number": s.surgery_number,
+                        "surgery_name": s.surgery_name,
+                        "doctor": str(s.doctor) if s.doctor else None,
+                        "organ_type": s.organ_matching.organ_type if s.organ_matching else None,
+                        "scheduled_date": s.scheduled_date,
+                        "status": s.status,
+                        "patient_name": (
+                            f"{s.organ_matching.patient.first_name} {s.organ_matching.patient.last_name}"
+                            if s.organ_matching and s.organ_matching.patient else None
+                        ),
+                        "birthdate": s.organ_matching.patient.birthdate.strftime('%Y-%m-%d') 
+                            if s.organ_matching and s.organ_matching.patient.birthdate else None,
+                        "created_at": s.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                    }
+                    for s in latest_successful_qs
+                ]
+            
 
             # 🧠 ORGANS NEEDED
             all_organs = [choice[0] for choice in OrganType.choices]
@@ -1296,6 +1326,7 @@ class MinistryDashboardViewSet(viewsets.ViewSet):
                 "total_surgeries": total_surgeries,
                 "successful_surgeries": successful_surgeries,
                 "success_percentage": success_percentage,
+                "latest_successful_surgeries": latest_successful,
 
                 # 🔔 alerts
                 "alerts": [
@@ -1411,34 +1442,6 @@ class MinistryDashboardViewSet(viewsets.ViewSet):
             # العمليات في المستشفى
             surgeries_count = Surgery.objects.filter(hospital=h).count()
             successful_surgeries_count = Surgery.objects.filter(hospital=h, status='مكتملة').count()
-            # ✅ آخر 3 عمليات ناجحة لكل مستشفى
-            latest_successful_qs = Surgery.objects.filter(
-                hospital=h,
-                 status__in=['تمت بنجاح', 'فشلت']
-            ).order_by('-created_at')[:3]
-
-            if not latest_successful_qs.exists():
-                latest_successful = "مفيش عمليات ناجحة"
-            else:
-                latest_successful = [
-                    {
-                        "id": s.id,
-                        "surgery_number": s.surgery_number,
-                        "surgery_name": s.surgery_name,
-                        "doctor": str(s.doctor) if s.doctor else None,
-                        "organ_type": s.organ_matching.organ_type if s.organ_matching else None,
-                        "scheduled_date": s.scheduled_date,
-                        "status": s.status,
-                        "patient_name": (
-                            f"{s.organ_matching.patient.first_name} {s.organ_matching.patient.last_name}"
-                            if s.organ_matching and s.organ_matching.patient else None
-                        ),
-                        "birthdate": s.organ_matching.patient.birthdate.strftime('%Y-%m-%d') 
-                            if s.organ_matching and s.organ_matching.patient.birthdate else None,
-                        "created_at": s.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-                    }
-                    for s in latest_successful_qs
-                ]
 
             # كل أنواع الأعضاء من الـ choices
             all_organs = [choice[0] for choice in OrganType.choices]
@@ -1481,7 +1484,7 @@ class MinistryDashboardViewSet(viewsets.ViewSet):
                 "organs_needed": organs_needed_list,
                 "hospital_alerts": alerts_data,
                 "surgeries": surgeries_list,
-                "latest_successful_surgeries": latest_successful,
+                # "latest_successful_surgeries": latest_successful,
             })
             hospitals_data.sort(key=lambda x: x['patients_count'], reverse=True)
 
@@ -1580,8 +1583,6 @@ class MinistryDashboardViewSet(viewsets.ViewSet):
             "ministry_alerts": ministry_alerts_data,
             "alerts_statistics": alerts_stats,
         })
-
-
 # from rest_framework.permissions import AllowAny
 
 # class MinistryAlertViewSet(viewsets.ModelViewSet):
