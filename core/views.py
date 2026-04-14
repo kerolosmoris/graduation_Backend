@@ -874,11 +874,10 @@ from django.db.models.functions import TruncMonth
 #             "alerts_statistics": alerts_stats,
 #         })
 
+
 from django.shortcuts import get_object_or_404
 class MinistryDashboardViewSet(viewsets.ViewSet):
 
-   
-   
     def list(self, request):
         alert_id = request.query_params.get('alert')
     
@@ -1075,18 +1074,6 @@ class MinistryDashboardViewSet(viewsets.ViewSet):
             surgeries_count = Surgery.objects.filter(hospital=h).count()
             successful_surgeries_count = Surgery.objects.filter(hospital=h, status='مكتملة').count()
 
-            # عدد الأعضاء المطلوبة لكل مستشفى مع اسم العضو وعدده
-            # organs_needed = Surgery.objects.filter(
-            #     hospital=h,
-            #     organ_matching__isnull=False
-            # ).values('organ_matching__organ_type') \
-            # .annotate(count=Count('organ_matching__organ_type')) \
-            # .order_by('-count')
-
-            # organs_needed_list = [
-            #     {"organ": o['organ_matching__organ_type'], "count": o['count']}
-            #     for o in organs_needed
-            # ]
             # كل أنواع الأعضاء من الـ choices
             all_organs = [choice[0] for choice in OrganType.choices]
 
@@ -1136,21 +1123,33 @@ class MinistryDashboardViewSet(viewsets.ViewSet):
                 h_data['rank'] = index
 
 
-        # # البيانات السابقة (عمليات، نسب نجاح، ... )
-        organ_operations = Surgery.objects.values('organ_matching__organ_type') \
-            .annotate(count=Count('id'))
+        all_organs = [choice[0] for choice in OrganType.choices]
 
         organ_data = []
-        for item in organ_operations:
-            organ_name = item['organ_matching__organ_type']
-            percentage = (item['count'] / total_surgeries) * 100 if total_surgeries > 0 else 0
-            successful_count = Surgery.objects.filter(
-                organ_matching__organ_type=organ_name, status='مكتملة'
+
+        for organ in all_organs:
+            count = Surgery.objects.filter(
+                organ_matching__organ_type=organ
             ).count()
-            success_percentage = (successful_count / item['count']) * 100 if item['count'] > 0 else 0
+
+            successful_count = Surgery.objects.filter(
+                organ_matching__organ_type=organ,
+                status='مكتملة'
+            ).count()
+
+            percentage = (
+                (count / total_surgeries) * 100
+                if total_surgeries > 0 else 0
+            )
+
+            success_percentage = (
+                (successful_count / count) * 100
+                if count > 0 else 0
+            )
+
             organ_data.append({
-                "organ": organ_name,
-                "count": item['count'],
+                "organ": organ,
+                "count": count,
                 "percentage": round(percentage, 2),
                 "successful_count": successful_count,
                 "success_percentage": round(success_percentage, 2)
@@ -1201,38 +1200,6 @@ class MinistryDashboardViewSet(viewsets.ViewSet):
                 "success_percentage": round((successful / total) * 100, 2) if total > 0 else 0
             })
 
-        # monthly_stats = Surgery.objects.annotate(month=TruncMonth('created_at')) \
-        #     .values('month') \
-        #     .annotate(
-        #         total=Count('id'),
-        #         successful=Count('id', filter=Q(status='مكتملة'))
-        #     )
-
-        # # نحولهم لـ dict علشان نعرف نجيب بسهولة
-        # stats_dict = {
-        #     stat['month'].month: stat for stat in monthly_stats
-        # }
-
-        # # 📅 كل الشهور
-        # monthly_data = []
-        # current_year = datetime.now().year
-
-        # for month in range(1, 13):
-        #     stat = stats_dict.get(month)
-
-        #     if stat:
-        #         total = stat['total']
-        #         successful = stat['successful']
-        #     else:
-        #         total = 0
-        #         successful = 0
-
-        #     monthly_data.append({
-        #         "month": format_date(datetime(current_year, month, 1), format='MMMM', locale='ar'),
-        #         "total_surgeries": total,
-        #         "successful_surgeries": successful,
-        #         "success_percentage": round((successful / total) * 100, 2) if total > 0 else 0
-        #     })
 
         return Response({
             "total_hospitals": total_hospitals,
@@ -1246,6 +1213,7 @@ class MinistryDashboardViewSet(viewsets.ViewSet):
             "ministry_alerts": ministry_alerts_data,
             "alerts_statistics": alerts_stats,
         })
+
 
 # from rest_framework.permissions import AllowAny
 
