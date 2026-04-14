@@ -881,28 +881,120 @@ class MinistryDashboardViewSet(viewsets.ViewSet):
    
     def list(self, request):
         alert_id = request.query_params.get('alert')
-
+    
     # 🔴 حالة Alert واحد
         if alert_id:
             a = get_object_or_404(AlertHospital, id=alert_id)
 
             return Response({
-                "id": a.id,
-                "message": a.message,
-                "message_title": a.message_title,
-                "alert_type": a.alert_type,
-                "read": a.read,
-                "created_at": a.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-                "hospital": {
-                    "id": a.hospital.id if a.hospital else None,
-                    "name": a.hospital.name if a.hospital else None
-                }
-            })
+            "id": a.id,
+            "message": a.message,
+            "message_title": a.message_title,
+            "alert_type": a.alert_type,
+            "read": a.read,
+            "created_at": a.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            "hospital": {
+                "id": a.hospital.id if a.hospital else None,
+                "name": a.hospital.name if a.hospital else None
+            }
+        })
         hospital_id = request.query_params.get('hospital')
 
-        # 🟦 لو عايزة مستشفى واحدة
+        # 🟦 HOSPITAL DETAILS
         if hospital_id:
             h = get_object_or_404(Hospital, id=hospital_id)
+
+            # 🔔 Alerts
+            alerts_qs = AlertHospital.objects.filter(hospital=h).order_by('-created_at')
+
+            # 🏥 Surgeries
+            surgeries_qs = Surgery.objects.filter(hospital=h)
+
+            # 👥 counts
+            patients_count = User.objects.filter(role='patient', hospital=h).count()
+            donors_count = User.objects.filter(role='donor', hospital=h).count()
+
+            total_surgeries = surgeries_qs.count()
+            successful_surgeries = surgeries_qs.filter(status='مكتملة').count()
+
+            success_percentage = (
+                round((successful_surgeries / total_surgeries) * 100, 2)
+                if total_surgeries > 0 else 0
+            )
+
+            # 🧠 ORGANS NEEDED
+            all_organs = [choice[0] for choice in OrganType.choices]
+
+            organs_stats = Surgery.objects.filter(
+                hospital=h,
+                organ_matching__isnull=False
+            ).values('organ_matching__organ_type') \
+             .annotate(count=Count('id'))
+
+            organs_dict = {
+                o['organ_matching__organ_type']: o['count']
+                for o in organs_stats
+            }
+
+            organs_needed = [
+                {
+                    "organ": organ,
+                    "count": organs_dict.get(organ, 0)
+                }
+                for organ in all_organs
+            ]
+
+            # 📦 RESPONSE
+            return Response({
+                "id": h.id,
+                "name": h.name,
+                "location": h.location,
+                "hospital_type": h.hospital_type,
+                "status": h.status,
+                "phone": h.phone,
+                "email": h.email,
+
+                "patients_count": patients_count,
+                "donors_count": donors_count,
+
+                "total_surgeries": total_surgeries,
+                "successful_surgeries": successful_surgeries,
+                "success_percentage": success_percentage,
+
+                # 🔔 alerts
+                "alerts": [
+                    {
+                        "id": a.id,
+                        "message": a.message,
+                        "message_title": a.message_title,
+                        "alert_type": a.alert_type,
+                        "read": a.read,
+                        "created_at": a.created_at.strftime('%Y-%m-%d %H:%M:%S')
+                    }
+                    for a in alerts_qs
+                ],
+
+                # 🏥 surgeries
+                "surgeries": [
+                    {
+                        "id": s.id,
+                        "surgery_number": s.surgery_number,
+                        "surgery_name": s.surgery_name,
+                        "status": s.status,
+                        "organ_type": s.organ_matching.organ_type if s.organ_matching else None,
+                        "scheduled_date": s.scheduled_date,
+                        "scheduled_time": s.scheduled_time,
+                        "created_at": s.created_at.strftime('%Y-%m-%d'),
+                        "patient_name": str(s.organ_matching.patient) if s.organ_matching else None,
+                        "birthdate": s.organ_matching.patient.birthdate.strftime('%Y-%m-%d') if s.organ_matching and s.organ_matching.patient.birthdate else None
+                    }
+                    for s in surgeries_qs
+                ],
+
+                # 🧠 organs needed
+                "organs_needed": organs_needed,
+            })
+
 
         total_hospitals = Hospital.objects.count()
         total_patients = User.objects.filter(role='patient').count()
@@ -1154,7 +1246,6 @@ class MinistryDashboardViewSet(viewsets.ViewSet):
             "ministry_alerts": ministry_alerts_data,
             "alerts_statistics": alerts_stats,
         })
-    
 
 # from rest_framework.permissions import AllowAny
 
