@@ -289,7 +289,7 @@ class OrganMatchingSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'patient', 'patient_detail', 'donor', 'donor_detail',
             'organ_type', 'match_percentage', 'hla_mismatch_count',
-            'ai_result', 'status', 'created_at'
+            'ai_result', 'status', 'created_at','request_number'
         ]
         # read_only_fields = ['hla_mismatch_count', 'match_percentage', 'ai_result', 'created_at']
 
