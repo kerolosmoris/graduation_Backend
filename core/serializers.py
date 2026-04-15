@@ -1053,5 +1053,6 @@ class MinistryAlertSerializer(serializers.ModelSerializer):
             'created_at',
             'priority',
             'read',
-            'ALERT_Status'
+            'ALERT_Status',
+            'sender_hospital'
         ]
