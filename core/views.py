@@ -1213,7 +1213,6 @@ from django.db.models.functions import TruncMonth
 #             "ministry_alerts": ministry_alerts_data,
 #             "alerts_statistics": alerts_stats,
 #         })
-
 from django.shortcuts import get_object_or_404
 class MinistryDashboardViewSet(viewsets.ViewSet):
 
@@ -1222,18 +1221,21 @@ class MinistryDashboardViewSet(viewsets.ViewSet):
     
     # 🔴 حالة Alert واحد
         if alert_id:
-            a = get_object_or_404(AlertHospital, id=alert_id)
+            a = get_object_or_404(MinistryAlert, id=alert_id)
 
             return Response({
             "id": a.id,
             "message": a.message,
             "message_title": a.message_title,
             "alert_type": a.alert_type,
+            "ALERT_Status": a.ALERT_Status,
+            "priority": a.priority,
             "read": a.read,
+            "description": a.description,
             "created_at": a.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            "hospital": {
-                "id": a.hospital.id if a.hospital else None,
-                "name": a.hospital.name if a.hospital else None
+            "sender_hospital": {
+                "id": a.sender_hospital.id if a.sender_hospital else None,
+                "name": a.sender_hospital.name if a.sender_hospital else None
             }
         })
         hospital_id = request.query_params.get('hospital')
@@ -1583,6 +1585,7 @@ class MinistryDashboardViewSet(viewsets.ViewSet):
             "ministry_alerts": ministry_alerts_data,
             "alerts_statistics": alerts_stats,
         })
+
 # from rest_framework.permissions import AllowAny
 
 # class MinistryAlertViewSet(viewsets.ModelViewSet):
